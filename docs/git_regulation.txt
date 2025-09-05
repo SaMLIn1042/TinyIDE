@@ -1,0 +1,73 @@
+极简化协作流程（全员遵守）
+这个流程的核心是：永远不要直接在主分支（master）上开发新功能。所有新功能都在各自的分支上完成。
+
+【重要提示】
+一、永远在分支上开发：这是避免混乱的第一守则。master 分支是神圣不可侵犯的稳定版本。
+二、频繁拉取（Pull）：每天开始编码前，务必 git pull origin master 更新本地代码，这样可以及早发现冲突。
+三、频繁提交（Commit）：完成一个小功能就提交一次，注释写清楚。不要等写了几百行代码才提交，那样冲突起来是灾难。
+四、一次只做一个功能：一个分支只做一件事（比如只做“打开文件”），不要在一个分支里又改界面又修bug。
+五、沟通！沟通！沟通！：如果你和队友正在修改同一个文件的同一区域，提前说一声！这样可以避免大量冲突。
+六、冲突不要怕：遇到合并冲突是正常的。冷静下来，打开冲突文件，根据Git给出的标记（<<<<<<<, =======, >>>>>>>）手动选择要保留的代码，然后重新提交。处理冲突时，一定要和修改那个代码的队友商量。
+
+
+
+1. 【每日开始工作前】拉取最新代码
+每天开始写代码前，每个人的第一件事就是确保自己的本地主分支是最新的。
+
+###
+# 切换到主分支
+git checkout master
+# 从远程仓库拉取最新的代码（获取其他队友的成果）
+git pull origin master
+###
+
+2. 【开发新功能】创建新分支
+假设你要开发一个“打开文件”的功能。
+
+分支命名规范：
+feature/xxx: 新功能（如 feature/syntax-highlight）
+fix/xxx:修复Bug（如 fix/crash-on-compile）
+docs/xxx: 文档更新（如 docs/update-readme）
+
+###
+# 从最新的master分支创建并切换到一个新分支，分支名要清晰
+git checkout -b feature/open-file-function
+###
+
+3. 【开发中】在分支上频繁提交
+在你的功能分支上，可以放心地、频繁地提交代码。提交信息要清晰。
+
+###
+# 添加所有修改的文件
+git add .
+# 提交到本地仓库，注释写清楚你做了什么
+git commit -m "feat: implemented the open file dialog and file reading logic"
+###
+
+commit信息规范（建议）：
+feat: 开头表示新功能
+fix: 开头表示修复bug
+docs: 开头表示文档更新
+style: 开头表示格式修改（不影响代码逻辑）
+refactor: 开头表示代码重构
+
+4. 【功能完成】推送到远程并申请合并
+当你完成这个“打开文件”功能，并且测试没问题后：
+
+###
+# 将你的本地分支推送到远程GitHub仓库
+git push -u origin feature/open-file-function
+###
+
+然后，打开GitHub仓库页面，你会看到一个提示，让你 “Compare & pull request”。
+点击它，创建一个拉取请求（Pull Request, PR）。
+在PR描述里，写清楚你这个分支完成了什么功能。
+
+5. 【代码审查与合并】合并回主分支（由组长完成）
+评审员收到PR后，查看代码变更，确认代码没问题，风格统一。
+确认无误后，在GitHub上点击 “Merge pull request”。
+这个操作会将 feature/open-file-function 分支的代码合并到 master 分支。
+合并后，这个功能分支的使命就完成了，可以在GitHub上删除。
+
+6. 【循环】开始下一个功能
+所有人再次回到第1步：git checkout master -> git pull origin master (现在你的master分支就有了刚才合并的“打开文件”功能) -> 创建下一个功能分支（如 feature/compile-button）-> 开始新的开发。
