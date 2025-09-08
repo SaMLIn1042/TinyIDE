@@ -6,15 +6,15 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
-    <height>600</height>
+    <width>919</width>
+    <height>657</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="QPlainTextEdit" name="plainTextEdit">
+   <widget class="Editor" name="editor">
     <property name="enabled">
      <bool>true</bool>
     </property>
@@ -22,12 +22,12 @@
      <rect>
       <x>10</x>
       <y>10</y>
-      <width>1920</width>
-      <height>1080</height>
+      <width>471</width>
+      <height>371</height>
      </rect>
     </property>
     <property name="sizePolicy">
-     <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+     <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
       <horstretch>100</horstretch>
       <verstretch>100</verstretch>
      </sizepolicy>
@@ -39,13 +39,23 @@
      </size>
     </property>
    </widget>
+   <widget class="QPlainTextEdit" name="outputTextEdit">
+    <property name="geometry">
+     <rect>
+      <x>510</x>
+      <y>430</y>
+      <width>441</width>
+      <height>261</height>
+     </rect>
+    </property>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>800</width>
+     <width>919</width>
      <height>21</height>
     </rect>
    </property>
@@ -77,6 +87,7 @@
      <string>编译(&amp;C)</string>
     </property>
     <addaction name="actionCompile"/>
+    <addaction name="actionRun"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
@@ -99,6 +110,7 @@
    <addaction name="actionSaveAs"/>
    <addaction name="actionUndo"/>
    <addaction name="actionCompile"/>
+   <addaction name="actionRun"/>
   </widget>
   <action name="actionNew">
    <property name="text">
@@ -170,7 +182,19 @@
     <string>编译(&amp;C)</string>
    </property>
   </action>
+  <action name="actionRun">
+   <property name="text">
+    <string>运行(&amp;R)</string>
+   </property>
+  </action>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>Editor</class>
+   <extends>QPlainTextEdit</extends>
+   <header>editor.h</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>
