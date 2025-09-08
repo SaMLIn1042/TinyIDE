@@ -1,39 +1,53 @@
 #include "compiler.h"
-#include <QTemporaryFile>
-#include <QProcess>
-#include <QFileInfo>
-#include <QDir>
 #include <QDebug>
+#include <QDir>
+#include <QFileInfo>
+#include <QTemporaryFile>
+#include <QTextStream>
+#include <QCoreApplication>
 
-QString program = "D:/Program Files/MinGW/bin/gcc.exe";
-
-Compiler::Compiler(QObject *parent) : QObject(parent), m_process(new QProcess(this)) {
-    // 连接QProcess的信号到我们的槽函数
+Compiler::Compiler(QObject *parent)
+    : QObject(parent),
+      m_process(new QProcess(this)),
+      m_runProcess(new QProcess(this)),
+      m_compileSuccess(false)
+{
     connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &Compiler::onProcessFinished);
     connect(m_runProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-                this, &Compiler::onRunProcessFinished);
+            this, &Compiler::onRunProcessFinished);
 }
 
-// compiler.cpp
+Compiler::~Compiler() {
+    if (m_process->state() != QProcess::NotRunning) {
+        m_process->kill();
+        m_process->waitForFinished();
+    }
+    if (m_runProcess->state() != QProcess::NotRunning) {
+        m_runProcess->kill();
+        m_runProcess->waitForFinished();
+    }
+}
+
 void Compiler::compile(const QString &sourceCode) {
-    // 清空之前的输出
+    m_compileSuccess = false;
     m_process->close();
 
-    // 确保临时目录存在
+    // 创建临时目录确保安全
     QDir tempDir(QDir::tempPath());
     if (!tempDir.exists()) {
-        emit compileFinished(false, "错误：临时目录不存在");
+        emit compileFinished(false, "错误：临时目录不存在: " + tempDir.path());
         return;
     }
 
-    // 创建临时文件路径
-    QString tempFilePath = tempDir.absoluteFilePath("TinyIDE_temp.c");
-    qDebug() << "临时文件路径:" << tempFilePath;
+    // 修复：使用QString格式化文件名
+    QString tempFileName = QString("TinyIDE_%1_%2.c")
+                          .arg(QCoreApplication::applicationPid())
+                          .arg(qrand());
+    QString tempFilePath = tempDir.absoluteFilePath(tempFileName);
 
     // 删除可能已存在的文件
     if (QFile::exists(tempFilePath)) {
-        qDebug() << "删除已存在的临时文件";
         QFile::remove(tempFilePath);
     }
 
@@ -48,162 +62,134 @@ void Compiler::compile(const QString &sourceCode) {
     out << sourceCode;
     file.close();
 
-    // 验证文件是否真的创建成功
+    // 验证文件是否创建成功
     if (!QFile::exists(tempFilePath)) {
         emit compileFinished(false, "错误：临时文件创建失败: " + tempFilePath);
         return;
     }
 
-    // 设置可执行文件路径 - 放在临时目录中
-    m_executablePath = QDir::currentPath() + "/TinyIDE_output.exe";
-    qDebug() << "可执行文件路径:" << m_executablePath;
+    // 修复：使用QString格式化可执行文件名
+    QString execFileName = QString("TinyIDE_output_%1.exe")
+                          .arg(QCoreApplication::applicationPid());
+    m_executablePath = tempDir.absoluteFilePath(execFileName);
 
     // 删除可能已存在的可执行文件
     if (QFile::exists(m_executablePath)) {
         QFile::remove(m_executablePath);
     }
 
-    // 设置编译命令
-    QString program = "gcc";
+    // 设置编译命令 - 使用绝对路径
     QStringList arguments;
-    arguments << "-static" << "-o" << m_executablePath << tempFilePath;
+    arguments << "-o" << m_executablePath << tempFilePath << "-static";
 
-    qDebug() << "执行命令:" << program << arguments;
+    qDebug() << "编译命令: gcc" << arguments;
 
     // 设置工作目录为临时目录
     m_process->setWorkingDirectory(tempDir.absolutePath());
 
     // 启动编译过程
-    m_process->start(program, arguments);
+    m_process->start("gcc", arguments);
 
-    if (!m_process->waitForStarted(5000)) {
-        emit compileFinished(false, "错误：无法启动编译器进程。请确保GCC已安装并在PATH中。");
+    if (!m_process->waitForStarted(3000)) {
+        QString error = "错误：无法启动编译器\n";
+        error += "请确保GCC已安装并在PATH中\n";
+        error += "尝试的命令: gcc " + arguments.join(" ");
+        emit compileFinished(false, error);
         return;
     }
 
-    // 等待进程完成
-    if (!m_process->waitForFinished(15000)) {
-        emit compileFinished(false, "错误：编译过程超时");
-        return;
-    }
+    // 保存临时文件路径供后续使用
+    m_tempFilePath = tempFilePath;
 }
 
 void Compiler::runProgram() {
-    // 检查当前是否已有进程在运行
-    if (m_runProcess->state() != QProcess::NotRunning) {
-        qDebug() << "已有进程在运行，先终止它";
-        m_runProcess->kill();
-        m_runProcess->waitForFinished(1000);
-    }
-
-    // 重置进程状态
-    m_runProcess->close();
-
-    qDebug() << "尝试运行程序:" << m_executablePath;
-
-    // 检查可执行文件是否存在
-    if (m_executablePath.isEmpty() || !QFile::exists(m_executablePath)) {
-        QString error = "错误：没有可执行文件或文件不存在\n";
-        error += "路径: " + m_executablePath + "\n";
-        error += "文件存在: " + QString(QFile::exists(m_executablePath) ? "是" : "否");
-        qDebug() << error;
-        emit runFinished(false, error);
+    if (!m_compileSuccess || !QFile::exists(m_executablePath)) {
+        emit runOutput("错误：请先成功编译程序");
+        emit runFinished(false, "未找到可执行文件");
         return;
     }
 
-    qDebug() << "运行程序:" << m_executablePath;
+    // 清理之前的运行状态
+    if (m_runProcess->state() != QProcess::NotRunning) {
+        m_runProcess->kill();
+        m_runProcess->waitForFinished();
+    }
 
-    // 设置工作目录为可执行文件所在目录
+    // 确保每次运行都重新连接信号
+    disconnect(m_runProcess, &QProcess::readyReadStandardOutput, 0, 0);
+    disconnect(m_runProcess, &QProcess::readyReadStandardError, 0, 0);
+
+    // 连接实时输出
+    connect(m_runProcess, &QProcess::readyReadStandardOutput, this, [this]() {
+        QString output = QString::fromLocal8Bit(m_runProcess->readAllStandardOutput());
+        emit runOutput(output);
+    });
+
+    connect(m_runProcess, &QProcess::readyReadStandardError, this, [this]() {
+        QString error = QString::fromLocal8Bit(m_runProcess->readAllStandardError());
+        emit runOutput("[ERROR] " + error);
+    });
+
+    // 启动程序
     QFileInfo exeInfo(m_executablePath);
     m_runProcess->setWorkingDirectory(exeInfo.path());
 
+    // 设置合并输出通道，确保能捕获所有输出
+    m_runProcess->setProcessChannelMode(QProcess::MergedChannels);
+
     // 启动程序
-    m_runProcess->start(m_executablePath, QStringList());
+    m_runProcess->start(m_executablePath);
 
-    if (!m_runProcess->waitForStarted(5000)) {
-        QString error = "错误：无法启动程序\n";
-        error += "错误详情: " + m_runProcess->errorString();
-        qDebug() << error;
-        emit runFinished(false, error);
+    if (!m_runProcess->waitForStarted(1000)) {
+        emit runOutput("启动失败: " + m_runProcess->errorString());
         return;
     }
 
-    qDebug() << "程序已启动，进程ID:" << m_runProcess->processId();
-
-    // 等待程序完成
-    if (!m_runProcess->waitForFinished(10000)) {
-        qDebug() << "程序运行超时，尝试终止";
-        m_runProcess->kill();
-        m_runProcess->waitForFinished(1000);
-        emit runFinished(false, "错误：程序运行超时");
-        return;
-    }
-
-    // 获取程序输出
-    QString standardOutput = QString::fromLocal8Bit(m_runProcess->readAllStandardOutput());
-    QString standardError = QString::fromLocal8Bit(m_runProcess->readAllStandardError());
-
-    qDebug() << "程序退出代码:" << m_runProcess->exitCode();
-    qDebug() << "程序输出:" << standardOutput;
-    qDebug() << "程序错误:" << standardError;
-
-    // 发送运行完成信号
-    QString fullOutput;
-    if (!standardOutput.isEmpty()) {
-        fullOutput += "程序输出:\n" + standardOutput + "\n\n";
-    }
-    if (!standardError.isEmpty()) {
-        fullOutput += "程序错误:\n" + standardError + "\n\n";
-    }
-
-    fullOutput += "程序退出代码: " + QString::number(m_runProcess->exitCode());
-
-    emit runFinished(m_runProcess->exitCode() == 0, fullOutput);
-}
-
-void Compiler::onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus) {
-    QString standardOutput = m_process->readAllStandardOutput();
-    QString standardError = m_process->readAllStandardError();
-
-    QString fullOutput;
-    if (!standardOutput.isEmpty()) {
-        fullOutput += "编译输出:\n" + standardOutput + "\n\n";
-    }
-    if (!standardError.isEmpty()) {
-        fullOutput += "编译错误:\n" + standardError + "\n\n";
-    }
-
-    fullOutput += "退出代码: " + QString::number(exitCode);
-
-    // 检查可执行文件是否已创建
-    if (exitCode == 0) {
-        if (QFile::exists(m_executablePath)) {
-            qDebug() << "可执行文件已创建:" << m_executablePath;
-            qDebug() << "文件大小:" << QFileInfo(m_executablePath).size() << "字节";
-            fullOutput += "\n可执行文件: " + m_executablePath;
-        } else {
-            qDebug() << "错误：可执行文件未创建";
-            fullOutput += "\n错误：可执行文件未创建";
-            exitCode = 1; // 标记为失败
+    // 等待程序完成，但设置超时时间
+    if (!m_runProcess->waitForFinished(5000)) { // 5秒超时
+        emit runOutput("程序运行超时，可能正在等待输入...");
+        // 尝试发送回车键
+        m_runProcess->write("\n");
+        if (!m_runProcess->waitForFinished(2000)) {
+            m_runProcess->kill();
+            emit runOutput("已终止程序");
         }
     }
+}
 
-    emit compileFinished(exitCode == 0, fullOutput);
+void Compiler::onProcessFinished(int exitCode, QProcess::ExitStatus) {
+    QString output = m_process->readAllStandardOutput() +
+                     m_process->readAllStandardError();
+
+    m_compileSuccess = (exitCode == 0 && QFile::exists(m_executablePath));
+
+    QString result = QString("编译%1！\n退出代码: %2\n%3")
+                    .arg(m_compileSuccess ? "成功" : "失败")
+                    .arg(exitCode)
+                    .arg(output);
+
+    // 删除临时源文件
+    if (!m_tempFilePath.isEmpty() && QFile::exists(m_tempFilePath)) {
+        QFile::remove(m_tempFilePath);
+    }
+
+    emit compileFinished(m_compileSuccess, result);
 }
 
 void Compiler::onRunProcessFinished(int exitCode, QProcess::ExitStatus exitStatus) {
-    QString standardOutput = m_runProcess->readAllStandardOutput();
-    QString standardError = m_runProcess->readAllStandardError();
+    Q_UNUSED(exitStatus)
 
-    QString fullOutput;
-    if (!standardOutput.isEmpty()) {
-        fullOutput += "程序输出:\n" + standardOutput + "\n\n";
+    // 获取所有输出
+    QString output = QString::fromLocal8Bit(m_runProcess->readAllStandardOutput());
+    QString error = QString::fromLocal8Bit(m_runProcess->readAllStandardError());
+
+    QString result = QString("程序运行结束\n退出代码: %1\n").arg(exitCode);
+    if (!output.isEmpty()) {
+        result += "输出:\n" + output;
     }
-    if (!standardError.isEmpty()) {
-        fullOutput += "程序错误:\n" + standardError + "\n\n";
+    if (!error.isEmpty()) {
+        result += "错误:\n" + error;
     }
 
-    fullOutput += "程序退出代码: " + QString::number(exitCode);
-
-    emit runFinished(exitCode == 0, fullOutput);
+    emit runFinished(exitCode == 0, result);
 }

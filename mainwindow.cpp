@@ -1,67 +1,81 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-#include "editor.h"
-#include <QMainWindow>
-#include <QAction>
-#include <QPlainTextEdit>
+#include <QScrollBar>
+#include <QStatusBar>
+#include <QDebug>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    m_editor = new Editor(this);
+
+    // 使用UI中已有的编辑器组件
+    m_editor = findChild<Editor*>("editor");
+    if(!m_editor) {
+        qDebug() << "警告：未找到editor组件，使用默认位置";
+        m_editor = new Editor(this);
+        // 添加到中央区域（兼容旧UI设计）
+        setCentralWidget(m_editor);
+    }
+
+    // 初始化编译器
     m_compiler = new Compiler(this);
-    //setCentralWidget(m_editor);
-    connect(m_compiler, &Compiler::compileFinished, this, &MainWindow::onCompileFinished);
-    connect(m_compiler, &Compiler::runFinished, this, &MainWindow::onRunFinished);
-    setWindowTitle("TinyIDE");
-    resize(1920, 1080);
-    statusBar()->showMessage("就绪");
+
+    // 连接信号
+    connect(m_compiler, &Compiler::compileFinished,
+            this, &MainWindow::onCompileFinished);
+
+    connect(m_compiler, &Compiler::runFinished,
+            this, &MainWindow::onRunFinished);
+
+    connect(m_compiler, &Compiler::runOutput,
+            this, &MainWindow::handleRunOutput);
 }
 
-MainWindow::~MainWindow()
-{
+MainWindow::~MainWindow() {
     delete ui;
 }
 
 void MainWindow::on_actionCompile_triggered() {
-    // 从编辑器获取代码
-    QString code = ui->editor->getCodeText();
-    // 交给编译器去编译
-    m_compiler->compile(code);
-    // 可以在状态栏显示“编译中...”
+    // 清空输出区域
+    ui->outputTextEdit->clear();
+    ui->outputTextEdit->appendPlainText("开始编译...");
     statusBar()->showMessage("编译中...");
+
+    // 使用UI中的editor获取代码
+    QString code = m_editor->getCodeText();
+    m_compiler->compile(code);
 }
 
 void MainWindow::on_actionRun_triggered() {
-    ui->outputTextEdit->appendPlainText("\n正在运行程序...");
+    ui->outputTextEdit->appendPlainText("\n--- 运行程序 ---");
+    statusBar()->showMessage("运行中...");
     m_compiler->runProgram();
 }
 
-// 8. 实现处理编译结果的槽函数
 void MainWindow::onCompileFinished(bool success, const QString &output) {
-    if (success) {
-        statusBar()->showMessage("编译成功！");
-        ui->outputTextEdit->appendPlainText("=== 编译成功 ===");
-        ui->outputTextEdit->appendPlainText(output);
-    } else {
-        statusBar()->showMessage("编译失败！");
-        // 显示错误信息output
-        ui->outputTextEdit->appendPlainText(output);
-    }
+    statusBar()->showMessage(success ? "编译成功" : "编译失败");
+    ui->outputTextEdit->appendPlainText(output);
+
+    // 滚动到底部
+    QScrollBar *scrollbar = ui->outputTextEdit->verticalScrollBar();
+    scrollbar->setValue(scrollbar->maximum());
 }
 
 void MainWindow::onRunFinished(bool success, const QString &output) {
-    ui->outputTextEdit->appendPlainText("\n=== 运行结果 ===");
+    statusBar()->showMessage(success ? "运行完成" : "运行失败");
     ui->outputTextEdit->appendPlainText(output);
 
-    if (success) {
-        statusBar()->showMessage("程序运行完成！");
-    } else {
-        statusBar()->showMessage("程序运行失败！");
-    }
+    // 滚动到底部
+    QScrollBar *scrollbar = ui->outputTextEdit->verticalScrollBar();
+    scrollbar->setValue(scrollbar->maximum());
+}
 
-    // 确保输出面板显示最新内容
-    ui->outputTextEdit->moveCursor(QTextCursor::End);
+void MainWindow::handleRunOutput(const QString &output) {
+    ui->outputTextEdit->appendPlainText(output);
+
+    // 滚动到底部
+    QScrollBar *scrollbar = ui->outputTextEdit->verticalScrollBar();
+    scrollbar->setValue(scrollbar->maximum());
 }

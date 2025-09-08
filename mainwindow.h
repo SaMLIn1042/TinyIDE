@@ -5,29 +5,29 @@
 #include "editor.h"
 #include "compiler.h"
 
-QT_BEGIN_NAMESPACE
-namespace Ui { class MainWindow; }
-QT_END_NAMESPACE
+namespace Ui {
+class MainWindow;
+}
 
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
 
 public:
-    MainWindow(QWidget *parent = nullptr);
+    explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
 private:
     Ui::MainWindow *ui;
-    Editor *m_editor;
+    Editor *m_editor;  // 使用UI中已有的编辑器
     Compiler *m_compiler;
 
 private slots:
     void on_actionCompile_triggered();
-    //声明一个槽函数来处理编译完成信号
-    void onCompileFinished(bool success, const QString &output);
     void on_actionRun_triggered();
+    void onCompileFinished(bool success, const QString &output);
     void onRunFinished(bool success, const QString &output);
+    void handleRunOutput(const QString &output);
 };
 
 #endif // MAINWINDOW_H
