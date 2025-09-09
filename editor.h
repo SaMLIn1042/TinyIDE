@@ -3,7 +3,7 @@
 
 #include <QPlainTextEdit>
 
-class Editor: public QPlainTextEdit
+class Editor : public QPlainTextEdit
 {
     Q_OBJECT
 public:
@@ -13,7 +13,6 @@ public:
     QString getCodeText() const;
 
 signals:
-
 };
 
 #endif // EDITOR_H
