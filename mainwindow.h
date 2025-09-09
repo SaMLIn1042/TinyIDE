@@ -5,8 +5,9 @@
 #include "editor.h"
 #include "compiler.h"
 
-namespace Ui {
-class MainWindow;
+namespace Ui
+{
+    class MainWindow;
 }
 
 class MainWindow : public QMainWindow
@@ -19,7 +20,7 @@ public:
 
 private:
     Ui::MainWindow *ui;
-    Editor *m_editor;  // 使用UI中已有的编辑器
+    Editor *m_editor;
     Compiler *m_compiler;
 
 private slots:

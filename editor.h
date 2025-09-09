@@ -13,7 +13,6 @@ public:
     QString getCodeText() const;
 
 signals:
-
 };
 
 #endif // EDITOR_H

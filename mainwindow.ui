@@ -14,40 +14,36 @@
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="Editor" name="editor">
-    <property name="enabled">
-     <bool>true</bool>
-    </property>
+   <widget class="QSplitter" name="splitter">
     <property name="geometry">
      <rect>
-      <x>10</x>
-      <y>10</y>
-      <width>471</width>
-      <height>371</height>
+      <x>230</x>
+      <y>30</y>
+      <width>256</width>
+      <height>384</height>
      </rect>
     </property>
-    <property name="sizePolicy">
-     <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-      <horstretch>100</horstretch>
-      <verstretch>100</verstretch>
-     </sizepolicy>
+    <property name="orientation">
+     <enum>Qt::Vertical</enum>
     </property>
-    <property name="maximumSize">
-     <size>
-      <width>16777214</width>
-      <height>16777215</height>
-     </size>
-    </property>
-   </widget>
-   <widget class="QPlainTextEdit" name="outputTextEdit">
-    <property name="geometry">
-     <rect>
-      <x>510</x>
-      <y>430</y>
-      <width>441</width>
-      <height>261</height>
-     </rect>
-    </property>
+    <widget class="Editor" name="editor">
+     <property name="enabled">
+      <bool>true</bool>
+     </property>
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>16777214</width>
+       <height>16777215</height>
+      </size>
+     </property>
+    </widget>
+    <widget class="QPlainTextEdit" name="outputTextEdit"/>
    </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
