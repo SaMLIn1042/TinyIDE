@@ -5,26 +5,26 @@
 #include <QDebug>
 #include <QSplitter>
 #include <QVBoxLayout>
-#include <QMessageBox>    // 用于消息提示框
-#include <QFileInfo>      // 用于文件操作
-#include <QFileDialog>    // 文件对话框
-#include <QFile>          // 文件操作
-#include <QTextStream>    // 文本流
+#include <QMessageBox>
+#include <QFileInfo>
+#include <QFileDialog>
+#include <QFile>
+#include <QTextStream>
 #include <QListWidget>
 
-
+// 初始化UI和核心组件
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow),
-      // 新增：初始化文件状态
+      // 初始化文件状态变量
       m_currentFilePath(""),
       m_isSaved(false)
 {
-    ui->setupUi(this);
+    ui->setupUi(this);  // 设置UI
 
-    // 确保在UI文件中正确命名了组件
-    m_editor = ui->editor; // 直接使用UI中的组件
+    // 获取编辑器组件
+    m_editor = ui->editor;
 
-    // 设置初始测试程序
+    // 设置初始示例代码
     QString initialCode =
         "#include <stdio.h>\n\n"
         "int main() {\n"
@@ -33,7 +33,7 @@ MainWindow::MainWindow(QWidget *parent)
         "}";
     m_editor->setPlainText(initialCode);
 
-    // 新增：连接编辑器内容变化信号
+    // 连接编辑器内容变化信号
     connect(m_editor, &QPlainTextEdit::textChanged,
             this, &MainWindow::onEditorTextChanged);
 
@@ -42,39 +42,39 @@ MainWindow::MainWindow(QWidget *parent)
     fileListWidget->addItem("main.c");
     fileListWidget->addItem("utils.c");
     fileListWidget->addItem("functions.c");
-    fileListWidget->setMaximumWidth(150); // 限制文件列表宽度
+    fileListWidget->setMaximumWidth(150);  // 限制文件列表宽度
 
-    // 创建右侧垂直分割器（编辑器和输出框）
+    // 创建右侧垂直分割器（编辑器 + 输出框）
     QSplitter *rightSplitter = new QSplitter(Qt::Vertical, this);
     rightSplitter->addWidget(ui->editor);
     rightSplitter->addWidget(ui->outputTextEdit);
 
-    // 设置右侧分割器比例（7:3）
+    // 设置分割比例（编辑器70%，输出框30%）
     rightSplitter->setStretchFactor(0, 7);
     rightSplitter->setStretchFactor(1, 3);
 
-    // 创建主水平分割器（左侧文件列表 + 右侧编辑/输出区域）
+    // 创建主水平分割器（左侧文件列表 + 右侧分割器）
     QSplitter *mainSplitter = new QSplitter(Qt::Horizontal, this);
     mainSplitter->addWidget(fileListWidget);
     mainSplitter->addWidget(rightSplitter);
 
-    // 设置主分割器比例（1:3）
-    mainSplitter->setStretchFactor(0, 1); // 文件列表占1份
-    mainSplitter->setStretchFactor(1, 3); // 编辑/输出区域占3份
+    // 设置主分割比例（文件列表25%，编辑区75%）
+    mainSplitter->setStretchFactor(0, 1);
+    mainSplitter->setStretchFactor(1, 3);
 
-    // 创建一个容器widget来添加边距
+    // 创建带边距的容器
     QWidget *container = new QWidget(this);
     QVBoxLayout *containerLayout = new QVBoxLayout(container);
-    containerLayout->setContentsMargins(10, 10, 10, 10); // 四周各10像素边距
+    containerLayout->setContentsMargins(10, 10, 10, 10);  // 设置10像素边距
     containerLayout->addWidget(mainSplitter);
 
     // 设置中央部件
     setCentralWidget(container);
 
-    // 初始化编译器
+    // 初始化编译器对象
     m_compiler = new Compiler(this);
 
-    // 连接信号
+    // 连接编译器信号
     connect(m_compiler, &Compiler::compileFinished,
             this, &MainWindow::onCompileFinished);
 
@@ -84,25 +84,26 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_compiler, &Compiler::runOutput,
             this, &MainWindow::handleRunOutput);
 
-    // 新增：初始化窗口标题
+    // 设置初始窗口标题
     setWindowTitle("TinyIDE - 未命名");
 
-    // 新增：连接文件列表点击事件
+    // 连接文件列表点击事件
     connect(fileListWidget, &QListWidget::itemClicked,
             this, &MainWindow::onFileItemClicked);
 }
 
+// 析构函数：清理资源
 MainWindow::~MainWindow()
 {
     delete ui;
 }
 
-// 更新文件列表
+// 更新文件列表（示例实现）
 void MainWindow::updateFileList() {
     fileListWidget->clear();
     fileMap.clear();
 
-    // 添加示例文件（实际项目中可以从项目目录读取）
+    // 添加示例文件列表
     QStringList files = {
         "main.c",
         "utils.c",
@@ -110,56 +111,53 @@ void MainWindow::updateFileList() {
         "headers.h"
     };
 
+    // 创建模拟文件路径并添加到列表
     foreach (const QString &file, files) {
-        // 创建模拟文件路径（实际项目中应为真实路径）
         QString filePath = QDir::homePath() + "/TinyIDE/" + file;
-        fileMap[file] = filePath;
+        fileMap[file] = filePath;  // 存储文件名到路径的映射
 
-        // 添加到列表
         QListWidgetItem *item = new QListWidgetItem(file);
         fileListWidget->addItem(item);
     }
 }
 
-// 文件列表点击事件
+// 文件列表项点击处理
 void MainWindow::onFileItemClicked(QListWidgetItem *item) {
     QString fileName = item->text();
     QString filePath = fileMap.value(fileName);
 
+    // 检查文件路径有效性
     if (filePath.isEmpty()) {
         QMessageBox::warning(this, "文件错误", "无法找到文件路径");
         return;
     }
 
-    // 检查当前文件是否需要保存
+    // 检查未保存的更改
     if (!m_isSaved) {
         QMessageBox::StandardButton reply;
         reply = QMessageBox::question(this, "保存提示",
                                      "当前文件有未保存的更改，是否保存？",
                                      QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
         if (reply == QMessageBox::Cancel) {
-            return; // 取消打开操作
+            return;  // 取消操作
         } else if (reply == QMessageBox::Save) {
             if (!on_actionSave_triggered()) {
-                return; // 保存失败，取消打开
+                return;  // 保存失败取消操作
             }
         }
     }
 
-    // 打开文件
+    // 打开并读取文件
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QMessageBox::critical(this, "错误", "无法打开文件: " + file.errorString());
         return;
     }
 
-    // 读取文件内容
-    QTextStream in(&file);
-    QString content = in.readAll();
-    file.close();
-
     // 显示文件内容
-    m_editor->setPlainText(content);
+    QTextStream in(&file);
+    m_editor->setPlainText(in.readAll());
+    file.close();
 
     // 更新文件状态
     m_currentFilePath = filePath;
@@ -167,104 +165,109 @@ void MainWindow::onFileItemClicked(QListWidgetItem *item) {
     setWindowTitle("TinyIDE - " + fileName);
 }
 
+// 编译操作处理
 void MainWindow::on_actionCompile_triggered()
 {
-    // 不再清空输出区域，而是添加分隔线
-    ui->outputTextEdit->appendPlainText("\n--- 开始编译 ---"); // 添加分隔线而不是清空
+    // 添加编译分隔线
+    ui->outputTextEdit->appendPlainText("\n--- 开始编译 ---");
     statusBar()->showMessage("编译中...");
 
-    // 使用UI中的editor获取代码
+    // 获取并编译当前代码
     QString code = m_editor->getCodeText();
     m_compiler->compile(code);
 }
 
+// 运行操作处理
 void MainWindow::on_actionRun_triggered()
 {
-    ui->outputTextEdit->appendPlainText("\n--- 运行程序 ---"); // 添加分隔线而不是清空
+    ui->outputTextEdit->appendPlainText("\n--- 运行程序 ---");
     statusBar()->showMessage("运行中...");
     m_compiler->runProgram();
 }
 
+// 编译完成处理
 void MainWindow::onCompileFinished(bool success, const QString &output)
 {
+    // 更新状态栏和输出框
     statusBar()->showMessage(success ? "编译成功" : "编译失败");
     ui->outputTextEdit->appendPlainText(output);
 
-    // 滚动到底部
+    // 自动滚动到底部
     QScrollBar *scrollbar = ui->outputTextEdit->verticalScrollBar();
     scrollbar->setValue(scrollbar->maximum());
 }
 
+// 运行完成处理
 void MainWindow::onRunFinished(bool success, const QString &output)
 {
     statusBar()->showMessage(success ? "运行完成" : "运行失败");
     ui->outputTextEdit->appendPlainText(output);
 
-    // 滚动到底部
+    // 自动滚动到底部
     QScrollBar *scrollbar = ui->outputTextEdit->verticalScrollBar();
     scrollbar->setValue(scrollbar->maximum());
 }
 
+// 运行时输出处理
 void MainWindow::handleRunOutput(const QString &output)
 {
     ui->outputTextEdit->appendPlainText(output);
 
-    // 滚动到底部
+    // 自动滚动到底部
     QScrollBar *scrollbar = ui->outputTextEdit->verticalScrollBar();
     scrollbar->setValue(scrollbar->maximum());
 }
-// 新增：新建文件功能
+
+// 新建文件处理
 void MainWindow::on_actionNew_triggered()
 {
-    // 检查当前文件是否有未保存的更改
+    // 检查未保存的更改
     if (!m_isSaved) {
         QMessageBox::StandardButton reply;
         reply = QMessageBox::question(this, "保存提示",
                                      "当前文件有未保存的更改，是否保存？",
                                      QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
         if (reply == QMessageBox::Cancel) {
-            return; // 取消新建操作
+            return;
         } else if (reply == QMessageBox::Save) {
-            // 如果选择保存，调用保存函数
             if (!on_actionSave_triggered()) {
-                return; // 保存失败则取消新建
+                return;
             }
         }
-        // 选择Discard则直接清空
     }
 
-    // 清空编辑器并重置状态
+    // 重置编辑器状态
     m_editor->clear();
     m_currentFilePath = "";
     m_isSaved = true;
     setWindowTitle("TinyIDE - 未命名");
-    ui->outputTextEdit->clear();
+    ui->outputTextEdit->clear();  // 清空输出框
 }
 
-// 新增：打开文件功能
+// 打开文件处理
 void MainWindow::on_actionOpen_triggered()
 {
-    // 检查当前文件是否未保存
+    // 检查未保存的更改
     if (!m_isSaved) {
         QMessageBox::StandardButton reply = QMessageBox::question(
             this, "保存提示", "当前文件有未保存的更改，是否保存？",
             QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel
         );
         if (reply == QMessageBox::Cancel) {
-            return; // 取消打开操作
+            return;
         } else if (reply == QMessageBox::Save) {
             if (!on_actionSave_triggered()) {
-                return; // 保存失败则取消打开
+                return;
             }
         }
     }
 
-    // 打开文件对话框，选择C语言文件
+    // 显示文件选择对话框
     QString filePath = QFileDialog::getOpenFileName(
         this, "打开文件", QDir::homePath(), "C源文件 (*.c);;所有文件 (*)"
     );
     if (filePath.isEmpty()) {
-        return; // 用户取消选择
+        return;  // 用户取消操作
     }
 
     // 读取文件内容
@@ -274,10 +277,9 @@ void MainWindow::on_actionOpen_triggered()
         return;
     }
 
-    // 显示文件内容到编辑器
+    // 显示文件内容
     QTextStream in(&file);
-    QString content = in.readAll();
-    m_editor->setPlainText(content);
+    m_editor->setPlainText(in.readAll());
     file.close();
 
     // 更新文件状态
@@ -286,10 +288,10 @@ void MainWindow::on_actionOpen_triggered()
     setWindowTitle("TinyIDE - " + QFileInfo(filePath).fileName());
 }
 
-// 保存文件
+// 保存文件处理
 bool MainWindow::on_actionSave_triggered()
 {
-    // 如果没有当前文件路径，调用另存为
+    // 无路径时调用另存为
     if (m_currentFilePath.isEmpty()) {
         return on_actionSaveAs_triggered();
     }
@@ -298,40 +300,44 @@ bool MainWindow::on_actionSave_triggered()
     QFile file(m_currentFilePath);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
         QMessageBox::critical(this, "错误", "无法保存文件: " + file.errorString());
-        return false; // 保存失败
+        return false;
     }
 
     QTextStream out(&file);
     out << m_editor->getCodeText();
     file.close();
 
-    m_isSaved = true; // 标记为已保存
+    // 更新保存状态
+    m_isSaved = true;
     statusBar()->showMessage("文件已保存: " + m_currentFilePath);
-    return true; // 保存成功
+    return true;
 }
 
-// 另存为文件
+// 另存为文件处理
 bool MainWindow::on_actionSaveAs_triggered()
 {
+    // 显示保存对话框
     QString filePath = QFileDialog::getSaveFileName(
         this, "另存为", QDir::homePath(), "C源文件 (*.c);;所有文件 (*)"
     );
     if (filePath.isEmpty()) {
-        return false; // 用户取消操作
+        return false;  // 用户取消操作
     }
 
-    // 确保文件扩展名为 .c
+    // 确保.c扩展名
     if (!filePath.endsWith(".c", Qt::CaseInsensitive)) {
         filePath += ".c";
     }
 
+    // 更新路径并保存
     m_currentFilePath = filePath;
-    return on_actionSave_triggered(); // 调用保存函数
+    return on_actionSave_triggered();
 }
-// 新增：关闭当前文件功能
+
+// 关闭文件处理
 void MainWindow::on_actionClose_triggered()
 {
-    // 如果文件未保存，提示保存
+    // 检查未保存的更改
     if (!m_isSaved) {
         QString fileName = m_currentFilePath.isEmpty() ? "未命名文件" : QFileInfo(m_currentFilePath).fileName();
         QMessageBox::StandardButton reply;
@@ -340,16 +346,15 @@ void MainWindow::on_actionClose_triggered()
                                      QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
 
         if (reply == QMessageBox::Cancel) {
-            return; // 取消关闭操作
+            return;
         } else if (reply == QMessageBox::Save) {
             if (!on_actionSave_triggered()) {
-                return; // 保存失败，取消关闭
+                return;
             }
         }
-        // 选择Discard则直接关闭，不保存
     }
 
-    // 清空编辑器内容和文件路径
+    // 重置编辑器状态
     m_editor->clear();
     m_currentFilePath.clear();
     m_isSaved = false;
@@ -357,10 +362,10 @@ void MainWindow::on_actionClose_triggered()
     statusBar()->showMessage("文件已关闭");
 }
 
-// 新增：退出应用程序功能
+// 退出应用处理
 void MainWindow::on_actionExit_triggered()
 {
-    // 如果有未保存的内容，先提示保存
+    // 检查未保存的更改
     if (!m_isSaved) {
         QString fileName = m_currentFilePath.isEmpty() ? "未命名文件" : QFileInfo(m_currentFilePath).fileName();
         QMessageBox::StandardButton reply;
@@ -369,33 +374,33 @@ void MainWindow::on_actionExit_triggered()
                                      QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
 
         if (reply == QMessageBox::Cancel) {
-            return; // 取消退出
+            return;
         } else if (reply == QMessageBox::Save) {
             if (!on_actionSave_triggered()) {
-                return; // 保存失败，取消退出
+                return;
             }
         }
-        // 选择Discard则直接退出，不保存
     }
 
-    // 退出应用程序
+    // 退出应用
     qApp->quit();
 }
 
-// 新增：跟踪编辑器内容变化
+// 编辑器内容变化处理
 void MainWindow::onEditorTextChanged()
 {
-    if (m_isSaved) { // 只有当前是已保存状态时才更新（避免重复触发）
+    // 标记文件为未保存状态
+    if (m_isSaved) {
         m_isSaved = false;
-        // 窗口标题添加*表示未保存
+
+        // 在窗口标题添加*标记
         QString title = "TinyIDE - ";
         if (m_currentFilePath.isEmpty()) {
             title += "未命名";
         } else {
             title += QFileInfo(m_currentFilePath).fileName();
         }
-        title += "*"; // *表示未保存
+        title += "*";  // 未保存标记
         setWindowTitle(title);
     }
 }
-

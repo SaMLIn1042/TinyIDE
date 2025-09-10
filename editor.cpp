@@ -8,31 +8,37 @@
 #include <QTextCursor>
 #include <QTextDocument>
 
+//初始化文本编辑器和动作指针
 Editor::Editor(QWidget *parent) : QPlainTextEdit(parent),
     undoAction(nullptr), cutAction(nullptr),
     copyAction(nullptr), pasteAction(nullptr),
     findAction(nullptr), replaceAction(nullptr), insertAction(nullptr)
 {
-    setUndoRedoEnabled(true);
-    findActionsFromMainWindow();
-    setupConnections();
-    updateActionStates();
+    setUndoRedoEnabled(true);  // 启用撤销/重做功能
+    findActionsFromMainWindow();  // 从主窗口查找关联动作
+    setupConnections();  // 建立信号槽连接
+    updateActionStates();  // 更新动作状态
 }
 
+// 获取编辑器中的纯文本内容
 QString Editor::getCodeText() const {
     return toPlainText();
 }
 
+// 在主窗口中查找并关联编辑动作
 void Editor::findActionsFromMainWindow() {
+    // 获取父窗口中的动作对象
     QMainWindow *mainWindow = qobject_cast<QMainWindow*>(window());
     if (!mainWindow) {
         qDebug() << "错误：未找到主窗口";
         return;
     }
 
+    // 遍历所有动作并匹配对象名
     QList<QAction*> allActions = mainWindow->findChildren<QAction*>();
     foreach (QAction *action, allActions) {
         const QString &objName = action->objectName();
+        // 根据对象名关联对应动作
         if (objName == "actionUndo") {
             undoAction = action;
         } else if (objName == "actionCut") {
@@ -50,6 +56,7 @@ void Editor::findActionsFromMainWindow() {
         }
     }
 
+    // 调试输出动作查找结果
     qDebug() << "动作匹配情况：";
     qDebug() << "actionUndo: " << (undoAction ? "找到" : "未找到");
     qDebug() << "actionCut: " << (cutAction ? "找到" : "未找到");
@@ -60,25 +67,30 @@ void Editor::findActionsFromMainWindow() {
     qDebug() << "actionInsert: " << (insertAction ? "找到" : "未找到");
 }
 
+// 建立动作与编辑器功能的连接
 void Editor::setupConnections() {
+    // 连接撤销动作
     if (undoAction) {
         disconnect(undoAction, 0, 0, 0);
         connect(undoAction, &QAction::triggered, this, &Editor::handleUndo);
         connect(this, &QPlainTextEdit::undoAvailable, undoAction, &QAction::setEnabled);
     }
 
+    // 连接剪切动作
     if (cutAction) {
         disconnect(cutAction, 0, 0, 0);
         connect(cutAction, &QAction::triggered, this, &Editor::handleCut);
         connect(this, &QPlainTextEdit::copyAvailable, cutAction, &QAction::setEnabled);
     }
 
+    // 连接复制动作
     if (copyAction) {
         disconnect(copyAction, 0, 0, 0);
         connect(copyAction, &QAction::triggered, this, &Editor::handleCopy);
         connect(this, &QPlainTextEdit::copyAvailable, copyAction, &QAction::setEnabled);
     }
 
+    // 连接粘贴动作
     if (pasteAction) {
         disconnect(pasteAction, 0, 0, 0);
         connect(pasteAction, &QAction::triggered, this, &Editor::handlePaste);
@@ -86,65 +98,79 @@ void Editor::setupConnections() {
                 this, &Editor::updatePasteState);
     }
 
+    // 连接查找动作（设置标准快捷键）
     if (findAction) {
         disconnect(findAction, 0, 0, 0);
-        findAction->setShortcut(QKeySequence::Find);   // 设置标准查找快捷键 (通常是 Ctrl+F)
+        findAction->setShortcut(QKeySequence::Find);   // 设置查找快捷键 (Ctrl+F)
         findAction->setShortcutContext(Qt::ApplicationShortcut);
         connect(findAction, &QAction::triggered, this, &Editor::handleFind);
     }
 
+    // 连接替换动作（设置标准快捷键）
     if (replaceAction) {
         disconnect(replaceAction, 0, 0, 0);
-        replaceAction->setShortcut(QKeySequence::Replace);  // Ctrl+H
+        replaceAction->setShortcut(QKeySequence::Replace);  // 设置替换快捷键 (Ctrl+H)
         replaceAction->setShortcutContext(Qt::ApplicationShortcut);
         connect(replaceAction, &QAction::triggered, this, &Editor::handleReplace);
     }
 
+    // 连接插入动作
     if (insertAction) {
         disconnect(insertAction, 0, 0, 0);
         connect(insertAction, &QAction::triggered, this, &Editor::handleInsert);
     }
 }
 
-// 修复：使用document()->isUndoAvailable()检查撤销状态
+// 更新编辑动作的启用状态
 void Editor::updateActionStates() {
+    // 更新撤销动作状态
     if (undoAction) {
-        // 正确的撤销状态检查方法
         undoAction->setEnabled(document()->isUndoAvailable());
     }
+
+    // 根据文本选择状态更新剪切/复制动作
     bool hasSelection = textCursor().hasSelection();
     if (cutAction) cutAction->setEnabled(hasSelection);
     if (copyAction) copyAction->setEnabled(hasSelection);
+
+    // 更新粘贴动作状态
     updatePasteState();
 }
 
+// 更新粘贴动作的启用状态（基于剪贴板内容）
 void Editor::updatePasteState() {
     if (pasteAction) {
         pasteAction->setEnabled(!QApplication::clipboard()->text().isEmpty());
     }
 }
 
+// 执行撤销操作
 void Editor::handleUndo() {
     undo();
     updateActionStates();
 }
 
+// 执行剪切操作
 void Editor::handleCut() {
     cut();
     updateActionStates();
 }
 
+// 执行复制操作
 void Editor::handleCopy() {
     copy();
     updateActionStates();
 }
 
+// 执行粘贴操作
 void Editor::handlePaste() {
     paste();
     updateActionStates();
 }
 
+// 处理查找功能
 void Editor::handleFind() {
+    // 显示查找对话框获取搜索文本
     bool ok;
     QString searchText = QInputDialog::getText(this, tr("查找"),
                                                tr("输入要查找的内容:"), QLineEdit::Normal,
@@ -152,17 +178,19 @@ void Editor::handleFind() {
     if (!ok || searchText.isEmpty())
         return;
 
+    // 设置查找选项（如大小写敏感）
     QTextDocument::FindFlags flags;
-    // 如果需要区分大小写，可以加一个checkbox来决定
-    // flags |= QTextDocument::FindCaseSensitively;
+    // flags |= QTextDocument::FindCaseSensitively; // 取消注释启用大小写敏感
 
+    // 从当前光标位置开始查找
     QTextCursor cursor = textCursor();
     cursor = document()->find(searchText, cursor, flags);
 
+    // 处理查找结果
     if (!cursor.isNull()) {
-        setTextCursor(cursor);
+        setTextCursor(cursor);  // 选中找到的文本
     } else {
-        // 没找到就从头开始找
+        // 未找到则从文档开头重新查找
         cursor = document()->find(searchText, QTextCursor(document()));
         if (!cursor.isNull()) {
             setTextCursor(cursor);
@@ -172,7 +200,9 @@ void Editor::handleFind() {
     }
 }
 
+// 处理替换功能
 void Editor::handleReplace() {
+    // 获取要查找的文本
     bool ok;
     QString searchText = QInputDialog::getText(this, tr("替换"),
                                                tr("输入要查找的内容:"), QLineEdit::Normal,
@@ -180,13 +210,14 @@ void Editor::handleReplace() {
     if (!ok || searchText.isEmpty())
         return;
 
+    // 获取替换文本
     QString replaceText = QInputDialog::getText(this, tr("替换"),
                                                 tr("替换为:"), QLineEdit::Normal,
                                                 "", &ok);
     if (!ok)
         return;
 
-    // 提供选择：替换一次还是全部替换
+    // 提供替换选项：单个替换或全部替换
     QStringList options;
     options << tr("替换当前匹配") << tr("替换全部匹配");
     QString choice = QInputDialog::getItem(this, tr("替换选项"),
@@ -194,34 +225,41 @@ void Editor::handleReplace() {
     if (!ok)
         return;
 
+    // 执行选择的替换操作
     if (choice == options[0]) {
-        replaceCurrent(searchText, replaceText);
+        replaceCurrent(searchText, replaceText);  // 替换当前匹配项
     } else {
-        replaceAll(searchText, replaceText);
+        replaceAll(searchText, replaceText);  // 替换所有匹配项
     }
 }
 
+// 替换当前选中的匹配项
 void Editor::replaceCurrent(const QString &searchText, const QString &replaceText) {
     QTextCursor cursor = document()->find(searchText, textCursor());
     if (!cursor.isNull()) {
-        cursor.insertText(replaceText);
-        setTextCursor(cursor);
+        cursor.insertText(replaceText);  // 执行替换
+        setTextCursor(cursor);  // 更新光标位置
     } else {
         qDebug() << "未找到匹配的文本: " << searchText;
     }
 }
 
+// 替换所有匹配项
 void Editor::replaceAll(const QString &searchText, const QString &replaceText) {
     QTextCursor cursor(document());
     int count = 0;
+
+    // 遍历文档替换所有匹配项
     while (!(cursor = document()->find(searchText, cursor)).isNull()) {
         cursor.insertText(replaceText);
-        ++count;
+        ++count;  // 计数替换次数
     }
     qDebug() << "共替换" << count << "处匹配文本";
 }
 
+// 处理文本插入功能
 void Editor::handleInsert() {
+    // 获取要插入的文本
     bool ok;
     QString insertText = QInputDialog::getText(this, tr("插入文本"),
                                                tr("输入要插入的内容:"), QLineEdit::Normal,
@@ -229,7 +267,8 @@ void Editor::handleInsert() {
     if (!ok || insertText.isEmpty())
         return;
 
+    // 在光标位置插入文本
     QTextCursor cursor = textCursor();
     cursor.insertText(insertText);
-    setTextCursor(cursor);
+    setTextCursor(cursor);  // 更新光标位置
 }
