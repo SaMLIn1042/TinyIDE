@@ -2,17 +2,32 @@
 #define EDITOR_H
 
 #include <QPlainTextEdit>
+#include <QAction>
 
-class Editor: public QPlainTextEdit
-{
+class Editor : public QPlainTextEdit {
     Q_OBJECT
+
 public:
     explicit Editor(QWidget *parent = nullptr);
-
-    // 添加一个公共方法，用于获取文本
     QString getCodeText() const;
 
-signals:
+private slots:
+    void handleUndo();
+    void handleCut();
+    void handleCopy();
+    void handlePaste();
+    void updatePasteState();
+
+private:
+    QAction *undoAction;
+    QAction *cutAction;
+    QAction *copyAction;
+    QAction *pasteAction;
+
+    // 必须在这里声明所有私有函数
+    void findActionsFromMainWindow();  // 关键：添加这个声明
+    void setupConnections();
+    void updateActionStates();
 };
 
 #endif // EDITOR_H
