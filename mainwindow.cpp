@@ -169,9 +169,8 @@ void MainWindow::onFileItemClicked(QListWidgetItem *item) {
 
 void MainWindow::on_actionCompile_triggered()
 {
-    // 清空输出区域
-    ui->outputTextEdit->clear();
-    ui->outputTextEdit->appendPlainText("开始编译...");
+    // 不再清空输出区域，而是添加分隔线
+    ui->outputTextEdit->appendPlainText("\n--- 开始编译 ---"); // 添加分隔线而不是清空
     statusBar()->showMessage("编译中...");
 
     // 使用UI中的editor获取代码
@@ -181,7 +180,7 @@ void MainWindow::on_actionCompile_triggered()
 
 void MainWindow::on_actionRun_triggered()
 {
-    ui->outputTextEdit->appendPlainText("\n--- 运行程序 ---");
+    ui->outputTextEdit->appendPlainText("\n--- 运行程序 ---"); // 添加分隔线而不是清空
     statusBar()->showMessage("运行中...");
     m_compiler->runProgram();
 }
