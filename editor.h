@@ -17,17 +17,26 @@ private slots:
     void handleCopy();
     void handlePaste();
     void updatePasteState();
+    void handleFind();
+    void handleReplace();
+    void handleInsert();
 
 private:
     QAction *undoAction;
     QAction *cutAction;
     QAction *copyAction;
     QAction *pasteAction;
+    QAction *findAction;
+    QAction *replaceAction;
+    QAction *insertAction;
 
-    // 必须在这里声明所有私有函数
-    void findActionsFromMainWindow();  // 关键：添加这个声明
+
+    void findActionsFromMainWindow();
     void setupConnections();
     void updateActionStates();
+
+    void replaceCurrent(const QString &searchText, const QString &replaceText);
+    void replaceAll(const QString &searchText, const QString &replaceText);
 };
 
 #endif // EDITOR_H
