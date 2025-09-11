@@ -37,6 +37,9 @@ MainWindow::MainWindow(QWidget *parent)
         "    return 0;\n"
         "}";
     m_editor->setPlainText(initialCode);
+    m_editor->setProperty("originalText", initialCode);
+    // 在Editor类中可以添加一个setOriginalText方法来设置m_originalText
+    m_editor->setOriginalText(initialCode);  // 初始化原始文本用于跟踪新增行
 
     // 连接编辑器内容变化信号
     connect(m_editor, &QPlainTextEdit::textChanged,
@@ -364,6 +367,9 @@ bool MainWindow::on_actionSave_triggered()
     // 更新保存状态
     m_isSaved = true;
     statusBar()->showMessage("文件已保存: " + m_currentFilePath);
+    // 添加：更新窗口标题为当前文件名
+    setWindowTitle("TinyIDE - " + QFileInfo(m_currentFilePath).fileName());
+
     return true;
 }
 
@@ -385,7 +391,9 @@ bool MainWindow::on_actionSaveAs_triggered()
 
     // 更新路径并保存
     m_currentFilePath = filePath;
-    return on_actionSave_triggered();
+    bool result = on_actionSave_triggered();
+
+    return result;
 }
 
 // 关闭文件处理
