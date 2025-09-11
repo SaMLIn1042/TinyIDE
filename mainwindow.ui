@@ -84,6 +84,7 @@
     </property>
     <addaction name="actionCompile"/>
     <addaction name="actionRun"/>
+    <addaction name="actionStop"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
@@ -107,6 +108,7 @@
    <addaction name="actionUndo"/>
    <addaction name="actionCompile"/>
    <addaction name="actionRun"/>
+   <addaction name="actionStop"/>
   </widget>
   <action name="actionNew">
    <property name="text">
@@ -181,6 +183,11 @@
   <action name="actionRun">
    <property name="text">
     <string>运行(&amp;R)</string>
+   </property>
+  </action>
+  <action name="actionStop">
+   <property name="text">
+    <string>结束运行(&amp;S)</string>
    </property>
   </action>
  </widget>

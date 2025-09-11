@@ -14,11 +14,15 @@ public:
 
     void compile(const QString &sourceCode);
     void runProgram();
+    void stopProgram();
+    void sendInput(const QString &input);
 
 signals:
+    void runStarted();
     void compileFinished(bool success, const QString &output);
     void runFinished(bool success, const QString &output);
     void runOutput(const QString &output);
+
 
 private slots:
     void onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
@@ -30,6 +34,7 @@ private:
     QString m_executablePath;
     QString m_tempFilePath;
     bool m_compileSuccess;
+    bool m_isTerminalOutput; // 新增：是否在终端输出模式
 };
 
 #endif // COMPILER_H
