@@ -60,7 +60,7 @@ void Compiler::compile(const QString &sourceCode)
 
     if (match.hasMatch()) {
         int insertPos = match.capturedEnd();
-        QString insertion = "\n    setvbuf(stdout, NULL, _IOLBF, 0); // IDE: 启用行缓冲\n";
+        QString insertion = "\n    setvbuf(stdout, NULL, _IONBF, 0); // IDE: 启用行缓冲\n";
         modifiedCode.insert(insertPos, insertion);
     } else {
         // 处理 void main() 等非标准形式
@@ -68,7 +68,7 @@ void Compiler::compile(const QString &sourceCode)
         match = mainRegex.match(modifiedCode);
         if (match.hasMatch()) {
             int insertPos = match.capturedEnd();
-            QString insertion = "\n    setvbuf(stdout, NULL, _IOLBF, 0); // IDE: 启用行缓冲\n";
+            QString insertion = "\n    setvbuf(stdout, NULL, _IONBF, 0); // IDE: 启用行缓冲\n";
             modifiedCode.insert(insertPos, insertion);
         }
     }
