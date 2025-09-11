@@ -23,7 +23,6 @@ signals:
     void runFinished(bool success, const QString &output);
     void runOutput(const QString &output);
 
-
 private slots:
     void onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onRunProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);

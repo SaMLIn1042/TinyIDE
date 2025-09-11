@@ -47,10 +47,12 @@ void Compiler::compile(const QString &sourceCode)
     QString modifiedCode = sourceCode;
 
     // 1. 确保包含必要头文件
-    if (!modifiedCode.contains("#include <stdio.h>")) {
+    if (!modifiedCode.contains("#include <stdio.h>"))
+    {
         modifiedCode.prepend("#include <stdio.h>\n");
     }
-    if (!modifiedCode.contains("#include <stdlib.h>")) {
+    if (!modifiedCode.contains("#include <stdlib.h>"))
+    {
         modifiedCode.prepend("#include <stdlib.h>\n");
     }
 
@@ -58,22 +60,24 @@ void Compiler::compile(const QString &sourceCode)
     QRegularExpression mainRegex(R"(int\s+main\s*\([^)]*\)\s*\{)");
     QRegularExpressionMatch match = mainRegex.match(modifiedCode);
 
-    if (match.hasMatch()) {
+    if (match.hasMatch())
+    {
         int insertPos = match.capturedEnd();
         QString insertion = "\n    setvbuf(stdout, NULL, _IONBF, 0); // IDE: 启用行缓冲\n";
         modifiedCode.insert(insertPos, insertion);
-    } else {
+    }
+    else
+    {
         // 处理 void main() 等非标准形式
         mainRegex.setPattern(R"(void\s+main\s*\([^)]*\)\s*\{)");
         match = mainRegex.match(modifiedCode);
-        if (match.hasMatch()) {
+        if (match.hasMatch())
+        {
             int insertPos = match.capturedEnd();
             QString insertion = "\n    setvbuf(stdout, NULL, _IONBF, 0); // IDE: 启用行缓冲\n";
             modifiedCode.insert(insertPos, insertion);
         }
     }
-
-
 
     // 检查临时目录是否存在
     QDir tempDir(QDir::tempPath());
@@ -188,8 +192,6 @@ void Compiler::runProgram()
     QFileInfo exeInfo(m_executablePath);
     m_runProcess->setWorkingDirectory(exeInfo.path());
 
-
-
     // 合并输出通道
     m_runProcess->setProcessChannelMode(QProcess::MergedChannels);
 
@@ -208,7 +210,8 @@ void Compiler::runProgram()
 
 void Compiler::sendInput(const QString &input)
 {
-    if (m_runProcess && m_runProcess->state() == QProcess::Running) {
+    if (m_runProcess && m_runProcess->state() == QProcess::Running)
+    {
         m_runProcess->write(input.toLocal8Bit());
         m_runProcess->write("\n"); // 添加换行符
     }
@@ -217,7 +220,8 @@ void Compiler::sendInput(const QString &input)
 void Compiler::stopProgram()
 {
     // 检查运行进程是否正在运行
-    if (m_runProcess->state() != QProcess::NotRunning) {
+    if (m_runProcess->state() != QProcess::NotRunning)
+    {
         // 终止运行进程
         m_runProcess->kill();
         m_runProcess->waitForFinished();
@@ -271,7 +275,8 @@ void Compiler::onRunProcessFinished(int exitCode, QProcess::ExitStatus exitStatu
         result += "错误:\n" + error;
     }
 
-    if (!m_executablePath.isEmpty() && QFile::exists(m_executablePath)) {
+    if (!m_executablePath.isEmpty() && QFile::exists(m_executablePath))
+    {
         QFile::remove(m_executablePath); // 删除可执行文件
     }
 

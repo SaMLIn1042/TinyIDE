@@ -63,7 +63,7 @@ private slots:
     void updateLineNumberArea(const QRect &rect, int dy);
     void onTextChanged();
     void setTabReplace(bool replace, int spaces = 4); // 仅保留一次声明
-
+    void handleComment();
 
 private:
     QAction *undoAction;
@@ -83,9 +83,7 @@ private:
     void updateActionStates();
     void replaceCurrent(const QString &searchText, const QString &replaceText);
     void replaceAll(const QString &searchText, const QString &replaceText);
-    // 在private slots中添加
-private slots:
-    void handleComment();
+    
 };
 
 #endif // EDITOR_H

@@ -39,7 +39,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_editor->setPlainText(initialCode);
     m_editor->setProperty("originalText", initialCode);
     // 在Editor类中可以添加一个setOriginalText方法来设置m_originalText
-    m_editor->setOriginalText(initialCode);  // 初始化原始文本用于跟踪新增行
+    m_editor->setOriginalText(initialCode); // 初始化原始文本用于跟踪新增行
 
     // 连接编辑器内容变化信号
     connect(m_editor, &QPlainTextEdit::textChanged,
@@ -135,18 +135,20 @@ MainWindow::MainWindow(QWidget *parent)
     m_inputWidget = inputWidget;
 
     // 连接运行状态变化信号，动态启用/禁用输入区域和停止按钮
-    connect(m_compiler, &Compiler::runStarted, this, [this]() {
-        ui->actionStop->setEnabled(true);
-        m_inputWidget->setEnabled(true); // 启用输入区域
-        m_inputLineEdit->setFocus(); // 焦点设置到输入框
-    });
+    connect(m_compiler, &Compiler::runStarted, this, [this]()
+            {
+                ui->actionStop->setEnabled(true);
+                m_inputWidget->setEnabled(true); // 启用输入区域
+                m_inputLineEdit->setFocus();     // 焦点设置到输入框
+            });
 
-    connect(m_compiler, &Compiler::runFinished, this, [this](bool success, const QString &output) {
-        Q_UNUSED(success)
-        Q_UNUSED(output)
-        ui->actionStop->setEnabled(false);
-        m_inputWidget->setEnabled(false); // 禁用输入区域
-    });
+    connect(m_compiler, &Compiler::runFinished, this, [this](bool success, const QString &output)
+            {
+                Q_UNUSED(success)
+                Q_UNUSED(output)
+                ui->actionStop->setEnabled(false);
+                m_inputWidget->setEnabled(false); // 禁用输入区域
+            });
 }
 
 // 析构函数：清理资源
@@ -156,7 +158,8 @@ MainWindow::~MainWindow()
 }
 
 // 更新文件列表（示例实现）
-void MainWindow::updateFileList() {
+void MainWindow::updateFileList()
+{
     fileListWidget->clear();
     fileMap.clear();
 
@@ -165,13 +168,13 @@ void MainWindow::updateFileList() {
         "main.c",
         "utils.c",
         "functions.c",
-        "headers.h"
-    };
+        "headers.h"};
 
     // 创建模拟文件路径并添加到列表
-    foreach (const QString &file, files) {
+    foreach (const QString &file, files)
+    {
         QString filePath = QDir::homePath() + "/TinyIDE/" + file;
-        fileMap[file] = filePath;  // 存储文件名到路径的映射
+        fileMap[file] = filePath; // 存储文件名到路径的映射
 
         QListWidgetItem *item = new QListWidgetItem(file);
         fileListWidget->addItem(item);
@@ -179,34 +182,42 @@ void MainWindow::updateFileList() {
 }
 
 // 文件列表项点击处理
-void MainWindow::onFileItemClicked(QListWidgetItem *item) {
+void MainWindow::onFileItemClicked(QListWidgetItem *item)
+{
     QString fileName = item->text();
     QString filePath = fileMap.value(fileName);
 
     // 检查文件路径有效性
-    if (filePath.isEmpty()) {
+    if (filePath.isEmpty())
+    {
         QMessageBox::warning(this, "文件错误", "无法找到文件路径");
         return;
     }
 
     // 检查未保存的更改
-    if (!m_isSaved) {
+    if (!m_isSaved)
+    {
         QMessageBox::StandardButton reply;
         reply = QMessageBox::question(this, "保存提示",
-                                     "当前文件有未保存的更改，是否保存？",
-                                     QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
-        if (reply == QMessageBox::Cancel) {
-            return;  // 取消操作
-        } else if (reply == QMessageBox::Save) {
-            if (!on_actionSave_triggered()) {
-                return;  // 保存失败取消操作
+                                      "当前文件有未保存的更改，是否保存？",
+                                      QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+        if (reply == QMessageBox::Cancel)
+        {
+            return; // 取消操作
+        }
+        else if (reply == QMessageBox::Save)
+        {
+            if (!on_actionSave_triggered())
+            {
+                return; // 保存失败取消操作
             }
         }
     }
 
     // 打开并读取文件
     QFile file(filePath);
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
         QMessageBox::critical(this, "错误", "无法打开文件: " + file.errorString());
         return;
     }
@@ -279,15 +290,20 @@ void MainWindow::handleRunOutput(const QString &output)
 void MainWindow::on_actionNew_triggered()
 {
     // 检查未保存的更改
-    if (!m_isSaved) {
+    if (!m_isSaved)
+    {
         QMessageBox::StandardButton reply;
         reply = QMessageBox::question(this, "保存提示",
-                                     "当前文件有未保存的更改，是否保存？",
-                                     QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
-        if (reply == QMessageBox::Cancel) {
+                                      "当前文件有未保存的更改，是否保存？",
+                                      QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+        if (reply == QMessageBox::Cancel)
+        {
             return;
-        } else if (reply == QMessageBox::Save) {
-            if (!on_actionSave_triggered()) {
+        }
+        else if (reply == QMessageBox::Save)
+        {
+            if (!on_actionSave_triggered())
+            {
                 return;
             }
         }
@@ -298,22 +314,26 @@ void MainWindow::on_actionNew_triggered()
     m_currentFilePath = "";
     m_isSaved = true;
     setWindowTitle("TinyIDE - 未命名");
-    ui->outputTextEdit->clear();  // 清空输出框
+    ui->outputTextEdit->clear(); // 清空输出框
 }
 
 // 打开文件处理
 void MainWindow::on_actionOpen_triggered()
 {
     // 检查未保存的更改
-    if (!m_isSaved) {
+    if (!m_isSaved)
+    {
         QMessageBox::StandardButton reply = QMessageBox::question(
             this, "保存提示", "当前文件有未保存的更改，是否保存？",
-            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel
-        );
-        if (reply == QMessageBox::Cancel) {
+            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+        if (reply == QMessageBox::Cancel)
+        {
             return;
-        } else if (reply == QMessageBox::Save) {
-            if (!on_actionSave_triggered()) {
+        }
+        else if (reply == QMessageBox::Save)
+        {
+            if (!on_actionSave_triggered())
+            {
                 return;
             }
         }
@@ -321,15 +341,16 @@ void MainWindow::on_actionOpen_triggered()
 
     // 显示文件选择对话框
     QString filePath = QFileDialog::getOpenFileName(
-        this, "打开文件", QDir::homePath(), "C源文件 (*.c);;所有文件 (*)"
-    );
-    if (filePath.isEmpty()) {
-        return;  // 用户取消操作
+        this, "打开文件", QDir::homePath(), "C源文件 (*.c);;所有文件 (*)");
+    if (filePath.isEmpty())
+    {
+        return; // 用户取消操作
     }
 
     // 读取文件内容
     QFile file(filePath);
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
         QMessageBox::critical(this, "错误", "无法打开文件: " + file.errorString());
         return;
     }
@@ -349,13 +370,15 @@ void MainWindow::on_actionOpen_triggered()
 bool MainWindow::on_actionSave_triggered()
 {
     // 无路径时调用另存为
-    if (m_currentFilePath.isEmpty()) {
+    if (m_currentFilePath.isEmpty())
+    {
         return on_actionSaveAs_triggered();
     }
 
     // 写入文件
     QFile file(m_currentFilePath);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
+    {
         QMessageBox::critical(this, "错误", "无法保存文件: " + file.errorString());
         return false;
     }
@@ -378,14 +401,15 @@ bool MainWindow::on_actionSaveAs_triggered()
 {
     // 显示保存对话框
     QString filePath = QFileDialog::getSaveFileName(
-        this, "另存为", QDir::homePath(), "C源文件 (*.c);;所有文件 (*)"
-    );
-    if (filePath.isEmpty()) {
-        return false;  // 用户取消操作
+        this, "另存为", QDir::homePath(), "C源文件 (*.c);;所有文件 (*)");
+    if (filePath.isEmpty())
+    {
+        return false; // 用户取消操作
     }
 
     // 确保.c扩展名
-    if (!filePath.endsWith(".c", Qt::CaseInsensitive)) {
+    if (!filePath.endsWith(".c", Qt::CaseInsensitive))
+    {
         filePath += ".c";
     }
 
@@ -400,17 +424,22 @@ bool MainWindow::on_actionSaveAs_triggered()
 void MainWindow::on_actionClose_triggered()
 {
     // 检查未保存的更改
-    if (!m_isSaved) {
+    if (!m_isSaved)
+    {
         QString fileName = m_currentFilePath.isEmpty() ? "未命名文件" : QFileInfo(m_currentFilePath).fileName();
         QMessageBox::StandardButton reply;
         reply = QMessageBox::question(this, "保存提示",
-                                     QString("%1 已修改，是否保存？").arg(fileName),
-                                     QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+                                      QString("%1 已修改，是否保存？").arg(fileName),
+                                      QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
 
-        if (reply == QMessageBox::Cancel) {
+        if (reply == QMessageBox::Cancel)
+        {
             return;
-        } else if (reply == QMessageBox::Save) {
-            if (!on_actionSave_triggered()) {
+        }
+        else if (reply == QMessageBox::Save)
+        {
+            if (!on_actionSave_triggered())
+            {
                 return;
             }
         }
@@ -428,17 +457,22 @@ void MainWindow::on_actionClose_triggered()
 void MainWindow::on_actionExit_triggered()
 {
     // 检查未保存的更改
-    if (!m_isSaved) {
+    if (!m_isSaved)
+    {
         QString fileName = m_currentFilePath.isEmpty() ? "未命名文件" : QFileInfo(m_currentFilePath).fileName();
         QMessageBox::StandardButton reply;
         reply = QMessageBox::question(this, "保存提示",
-                                     QString("%1 已修改，是否保存？").arg(fileName),
-                                     QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+                                      QString("%1 已修改，是否保存？").arg(fileName),
+                                      QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
 
-        if (reply == QMessageBox::Cancel) {
+        if (reply == QMessageBox::Cancel)
+        {
             return;
-        } else if (reply == QMessageBox::Save) {
-            if (!on_actionSave_triggered()) {
+        }
+        else if (reply == QMessageBox::Save)
+        {
+            if (!on_actionSave_triggered())
+            {
                 return;
             }
         }
@@ -459,17 +493,21 @@ void MainWindow::on_actionStop_triggered()
 void MainWindow::onEditorTextChanged()
 {
     // 标记文件为未保存状态
-    if (m_isSaved) {
+    if (m_isSaved)
+    {
         m_isSaved = false;
 
         // 在窗口标题添加*标记
         QString title = "TinyIDE - ";
-        if (m_currentFilePath.isEmpty()) {
+        if (m_currentFilePath.isEmpty())
+        {
             title += "未命名";
-        } else {
+        }
+        else
+        {
             title += QFileInfo(m_currentFilePath).fileName();
         }
-        title += "*";  // 未保存标记
+        title += "*"; // 未保存标记
         setWindowTitle(title);
     }
 }
@@ -477,7 +515,8 @@ void MainWindow::onEditorTextChanged()
 void MainWindow::onSendInput()
 {
     QString input = m_inputLineEdit->text();
-    if (!input.isEmpty()) {
+    if (!input.isEmpty())
+    {
         // 发送输入到运行中的程序
         m_compiler->sendInput(input);
 
