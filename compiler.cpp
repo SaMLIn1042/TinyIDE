@@ -5,6 +5,8 @@
 #include <QTemporaryFile>
 #include <QTextStream>
 #include <QCoreApplication>
+#include <QRegularExpression>
+#include <QRegularExpressionMatch>
 
 Compiler::Compiler(QObject *parent)
     : QObject(parent),
@@ -41,6 +43,38 @@ void Compiler::compile(const QString &sourceCode)
     m_compileSuccess = false; // 重置编译状态
     m_process->close();       // 关闭之前的编译进程
 
+    // ===== 核心修改：自动插入行缓冲设置 =====
+    QString modifiedCode = sourceCode;
+
+    // 1. 确保包含必要头文件
+    if (!modifiedCode.contains("#include <stdio.h>")) {
+        modifiedCode.prepend("#include <stdio.h>\n");
+    }
+    if (!modifiedCode.contains("#include <stdlib.h>")) {
+        modifiedCode.prepend("#include <stdlib.h>\n");
+    }
+
+    // 2. 在 main() 函数开头插入行缓冲设置
+    QRegularExpression mainRegex(R"(int\s+main\s*\([^)]*\)\s*\{)");
+    QRegularExpressionMatch match = mainRegex.match(modifiedCode);
+
+    if (match.hasMatch()) {
+        int insertPos = match.capturedEnd();
+        QString insertion = "\n    setvbuf(stdout, NULL, _IOLBF, 0); // IDE: 启用行缓冲\n";
+        modifiedCode.insert(insertPos, insertion);
+    } else {
+        // 处理 void main() 等非标准形式
+        mainRegex.setPattern(R"(void\s+main\s*\([^)]*\)\s*\{)");
+        match = mainRegex.match(modifiedCode);
+        if (match.hasMatch()) {
+            int insertPos = match.capturedEnd();
+            QString insertion = "\n    setvbuf(stdout, NULL, _IOLBF, 0); // IDE: 启用行缓冲\n";
+            modifiedCode.insert(insertPos, insertion);
+        }
+    }
+
+
+
     // 检查临时目录是否存在
     QDir tempDir(QDir::tempPath());
     if (!tempDir.exists())
@@ -69,8 +103,9 @@ void Compiler::compile(const QString &sourceCode)
         return;
     }
 
+    // 写入修改后的代码
     QTextStream out(&file);
-    out << sourceCode; // 写入源代码
+    out << modifiedCode;
     file.close();
 
     // 验证文件是否创建成功
@@ -234,6 +269,10 @@ void Compiler::onRunProcessFinished(int exitCode, QProcess::ExitStatus exitStatu
     if (!error.isEmpty())
     {
         result += "错误:\n" + error;
+    }
+
+    if (!m_executablePath.isEmpty() && QFile::exists(m_executablePath)) {
+        QFile::remove(m_executablePath); // 删除可执行文件
     }
 
     // 发送运行完成信号
