@@ -7,15 +7,18 @@
 #include <QInputDialog>
 #include <QTextCursor>
 #include <QTextDocument>
+#include <QFontDialog>  // 新增：字体对话框头文件
+#include <QStatusBar>
 
 // 初始化文本编辑器和动作指针
 Editor::Editor(QWidget *parent) : QPlainTextEdit(parent),
     undoAction(nullptr), cutAction(nullptr),
     copyAction(nullptr), pasteAction(nullptr),
-    findAction(nullptr), replaceAction(nullptr), insertAction(nullptr)
+    findAction(nullptr), replaceAction(nullptr),
+    insertAction(nullptr), fontAction(nullptr)  // 新增：初始化fontAction
 {
     setUndoRedoEnabled(true);  // 启用撤销/重做功能
-    setTabReplace(true, 4);    // 初始化Tab替换为4个空格（新增调用）
+    setTabReplace(true, 4);    // 初始化Tab替换为4个空格
     findActionsFromMainWindow();  // 从主窗口查找关联动作
     setupConnections();  // 建立信号槽连接
     updateActionStates();  // 更新动作状态
@@ -24,6 +27,18 @@ Editor::Editor(QWidget *parent) : QPlainTextEdit(parent),
 // 获取编辑器中的纯文本内容
 QString Editor::getCodeText() const {
     return toPlainText();
+}
+
+// 设置编辑器字体
+void Editor::setEditorFont(const QFont &font) {
+    setFont(font);
+    // 更新Tab宽度以适应新字体
+    setTabReplace(true, 4);
+}
+
+// 获取当前编辑器字体
+QFont Editor::getEditorFont() const {
+    return font();
 }
 
 // 在主窗口中查找并关联编辑动作
@@ -54,6 +69,8 @@ void Editor::findActionsFromMainWindow() {
             replaceAction = action;
         } else if (objName == "actionInsert") {
             insertAction = action;
+        } else if (objName == "actionFont") {  // 新增：关联字体设置动作
+            fontAction = action;
         }
     }
 
@@ -66,6 +83,7 @@ void Editor::findActionsFromMainWindow() {
     qDebug() << "actionFind: " << (findAction ? "找到" : "未找到");
     qDebug() << "actionReplace: " << (replaceAction ? "找到" : "未找到");
     qDebug() << "actionInsert: " << (insertAction ? "找到" : "未找到");
+    qDebug() << "actionFont: " << (fontAction ? "找到" : "未找到");  // 新增：字体动作状态
 }
 
 // 建立动作与编辑器功能的连接
@@ -119,6 +137,14 @@ void Editor::setupConnections() {
     if (insertAction) {
         disconnect(insertAction, 0, 0, 0);
         connect(insertAction, &QAction::triggered, this, &Editor::handleInsert);
+    }
+
+    // 新增：连接字体设置动作
+    if (fontAction) {
+        disconnect(fontAction, 0, 0, 0);
+        fontAction->setShortcut(QKeySequence::fromString("Ctrl+F12"));  // 设置字体快捷键
+        fontAction->setShortcutContext(Qt::ApplicationShortcut);
+        connect(fontAction, &QAction::triggered, this, &Editor::handleFontSettings);
     }
 }
 
@@ -281,6 +307,39 @@ void Editor::handleInsert() {
     QTextCursor cursor = textCursor();
     cursor.insertText(insertText);
     setTextCursor(cursor);  // 更新光标位置
+}
+
+// 新增：处理字体设置功能
+void Editor::handleFontSettings() {
+    bool ok;
+    QFont currentFont = getEditorFont();  // 获取当前字体
+
+    // 弹出字体选择对话框
+    QFont newFont = QFontDialog::getFont(
+        &ok,                  // 用户是否点击确定
+        currentFont,          // 当前字体作为初始值
+        this,                 // 父窗口
+        tr("选择编辑器字体")  // 对话框标题
+    );
+
+    if (ok) {
+        // 应用新字体
+        setEditorFont(newFont);
+
+        // 在状态栏显示字体信息（如果有状态栏）
+        QMainWindow *mainWindow = qobject_cast<QMainWindow*>(window());
+        if (mainWindow && mainWindow->statusBar()) {
+            mainWindow->statusBar()->showMessage(
+                tr("字体已更新: %1 %2pt")
+                .arg(newFont.family())
+                .arg(newFont.pointSize()),
+                3000  // 3秒后自动消失
+            );
+        }
+
+        qDebug() << "字体已更新为: " << newFont.family()
+                 << ", 大小: " << newFont.pointSize() << "pt";
+    }
 }
 
 // 实现Tab替换为空格的核心功能
