@@ -49,6 +49,15 @@ MainWindow::MainWindow(QWidget *parent)
     fileListWidget->addItem("functions.c");
     fileListWidget->setMaximumWidth(150);
 
+    // 设置为只读（禁止编辑）
+    ui->outputTextEdit->setReadOnly(true);
+
+    // 禁用文本编辑功能（防止通过上下文菜单修改）
+    ui->outputTextEdit->setUndoRedoEnabled(false);
+
+    // 禁用拖放功能（防止拖入内容）
+    ui->outputTextEdit->setAcceptDrops(false);
+
     // 创建输入区域
     QWidget *inputWidget = new QWidget(this);
     QHBoxLayout *inputLayout = new QHBoxLayout(inputWidget);
