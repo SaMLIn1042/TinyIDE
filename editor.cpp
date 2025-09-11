@@ -8,13 +8,14 @@
 #include <QTextCursor>
 #include <QTextDocument>
 
-//初始化文本编辑器和动作指针
+// 初始化文本编辑器和动作指针
 Editor::Editor(QWidget *parent) : QPlainTextEdit(parent),
     undoAction(nullptr), cutAction(nullptr),
     copyAction(nullptr), pasteAction(nullptr),
     findAction(nullptr), replaceAction(nullptr), insertAction(nullptr)
 {
     setUndoRedoEnabled(true);  // 启用撤销/重做功能
+    setTabReplace(true, 4);    // 初始化Tab替换为4个空格（新增调用）
     findActionsFromMainWindow();  // 从主窗口查找关联动作
     setupConnections();  // 建立信号槽连接
     updateActionStates();  // 更新动作状态
@@ -162,9 +163,18 @@ void Editor::handleCopy() {
     updateActionStates();
 }
 
-// 执行粘贴操作
+// 执行粘贴操作（补充Tab替换逻辑）
 void Editor::handlePaste() {
-    paste();
+    QClipboard *clipboard = QApplication::clipboard();
+    QString text = clipboard->text();
+
+    // 将粘贴内容中的Tab替换为设置的空格数（使用当前Tab宽度计算空格数）
+    int tabWidth = tabStopWidth() / fontMetrics().width(' ');
+    text.replace("\t", QString(" ").repeated(tabWidth));
+
+    QTextCursor cursor = textCursor();
+    cursor.insertText(text);
+    setTextCursor(cursor);
     updateActionStates();
 }
 
@@ -271,4 +281,15 @@ void Editor::handleInsert() {
     QTextCursor cursor = textCursor();
     cursor.insertText(insertText);
     setTextCursor(cursor);  // 更新光标位置
+}
+
+// 实现Tab替换为空格的核心功能
+void Editor::setTabReplace(bool replace, int spaces) {
+    if (replace) {
+        // 设置Tab键插入对应数量的空格（通过调整Tab宽度实现）
+        setTabStopWidth(spaces * fontMetrics().width(' '));
+    } else {
+        // 恢复默认Tab行为（8个空格宽度）
+        setTabStopWidth(8 * fontMetrics().width(' '));
+    }
 }

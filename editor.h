@@ -20,6 +20,7 @@ private slots:
     void handleFind();
     void handleReplace();
     void handleInsert();
+    void setTabReplace(bool replace, int spaces = 4); // 仅保留一次声明
 
 private:
     QAction *undoAction;
@@ -30,11 +31,9 @@ private:
     QAction *replaceAction;
     QAction *insertAction;
 
-
     void findActionsFromMainWindow();
     void setupConnections();
     void updateActionStates();
-
     void replaceCurrent(const QString &searchText, const QString &replaceText);
     void replaceAll(const QString &searchText, const QString &replaceText);
 };
