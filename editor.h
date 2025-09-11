@@ -58,6 +58,7 @@ private slots:
     void highlightCurrentLine();
     void updateLineNumberArea(const QRect &rect, int dy);
     void onTextChanged();
+    void setTabReplace(bool replace, int spaces = 4); // 仅保留一次声明
 
 
 private:
@@ -72,11 +73,9 @@ private:
     QString m_originalText;  // 用于跟踪新增内容的原始文本
     QSet<int> m_newLineNumbers;  // 新增行号集合
 
-
     void findActionsFromMainWindow();
     void setupConnections();
     void updateActionStates();
-
     void replaceCurrent(const QString &searchText, const QString &replaceText);
     void replaceAll(const QString &searchText, const QString &replaceText);
 };
