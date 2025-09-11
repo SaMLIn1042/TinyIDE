@@ -3,6 +3,7 @@
 
 #include <QPlainTextEdit>
 #include <QAction>
+#include <QFont>
 #include <QWidget>
 #include <QPaintEvent>
 #include <QResizeEvent>
@@ -15,6 +16,8 @@ class Editor : public QPlainTextEdit {
 public:
     explicit Editor(QWidget *parent = nullptr);
     QString getCodeText() const;
+    void setEditorFont(const QFont &font); // 设置编辑器字体
+    QFont getEditorFont() const; // 获取当前字体
 
     void highlightNewLines();
     void setOriginalText(const QString &text);
@@ -54,6 +57,7 @@ private slots:
     void handleFind();
     void handleReplace();
     void handleInsert();
+    void handleFontSettings(); // 新增：处理字体设置
     void updateLineNumberAreaWidth(int newBlockCount);
     void highlightCurrentLine();
     void updateLineNumberArea(const QRect &rect, int dy);
@@ -69,6 +73,7 @@ private:
     QAction *findAction;
     QAction *replaceAction;
     QAction *insertAction;
+    QAction *fontAction; // 新增：字体设置动作
     LineNumberArea *lineNumberArea;
     QString m_originalText;  // 用于跟踪新增内容的原始文本
     QSet<int> m_newLineNumbers;  // 新增行号集合
