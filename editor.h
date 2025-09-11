@@ -83,6 +83,9 @@ private:
     void updateActionStates();
     void replaceCurrent(const QString &searchText, const QString &replaceText);
     void replaceAll(const QString &searchText, const QString &replaceText);
+    // 在private slots中添加
+private slots:
+    void handleComment();
 };
 
 #endif // EDITOR_H
