@@ -153,6 +153,8 @@ void Compiler::runProgram()
     QFileInfo exeInfo(m_executablePath);
     m_runProcess->setWorkingDirectory(exeInfo.path());
 
+
+
     // 合并输出通道
     m_runProcess->setProcessChannelMode(QProcess::MergedChannels);
 
@@ -166,20 +168,27 @@ void Compiler::runProgram()
         return;
     }
 
-    // 等待程序完成（5秒超时）
-    if (!m_runProcess->waitForFinished(5000))
-    {
-        emit runOutput("程序运行超时，可能正在等待输入...");
+    emit runStarted();
+}
 
-        // 尝试发送回车键
-        m_runProcess->write("\n");
+void Compiler::sendInput(const QString &input)
+{
+    if (m_runProcess && m_runProcess->state() == QProcess::Running) {
+        m_runProcess->write(input.toLocal8Bit());
+        m_runProcess->write("\n"); // 添加换行符
+    }
+}
 
-        // 再次等待（2秒超时）
-        if (!m_runProcess->waitForFinished(2000))
-        {
-            m_runProcess->kill();
-            emit runOutput("已终止程序");
-        }
+void Compiler::stopProgram()
+{
+    // 检查运行进程是否正在运行
+    if (m_runProcess->state() != QProcess::NotRunning) {
+        // 终止运行进程
+        m_runProcess->kill();
+        m_runProcess->waitForFinished();
+
+        // 发送程序被终止的信号
+        emit runFinished(false, "程序已被用户终止");
     }
 }
 

@@ -28,6 +28,8 @@ private:
     QString m_currentFilePath;
     QListWidget *fileListWidget;
     QMap<QString, QString> fileMap;
+    QWidget *m_inputWidget;
+    QLineEdit *m_inputLineEdit;
     bool m_isSaved;
 
 private slots:
@@ -42,9 +44,11 @@ private slots:
     bool on_actionSaveAs_triggered();
     void on_actionClose_triggered();
     void on_actionExit_triggered();
+    void on_actionStop_triggered();
     void onEditorTextChanged();
     void onFileItemClicked(QListWidgetItem *item);
     void updateFileList();
+    void onSendInput();
 };
 
 #endif // MAINWINDOW_H

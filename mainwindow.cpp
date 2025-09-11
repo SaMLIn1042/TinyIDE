@@ -11,15 +11,18 @@
 #include <QFile>
 #include <QTextStream>
 #include <QListWidget>
+#include <QWidget>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QLabel>
 
 // 初始化UI和核心组件
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow),
-      // 初始化文件状态变量
       m_currentFilePath(""),
       m_isSaved(false)
 {
-    ui->setupUi(this);  // 设置UI
+    ui->setupUi(this);
 
     // 获取编辑器组件
     m_editor = ui->editor;
@@ -28,7 +31,9 @@ MainWindow::MainWindow(QWidget *parent)
     QString initialCode =
         "#include <stdio.h>\n\n"
         "int main() {\n"
+        "    scanf(\"%d\");\n"
         "    printf(\"Hello, World!\\n\");\n"
+        "    scanf(\"%d\");\n"
         "    return 0;\n"
         "}";
     m_editor->setPlainText(initialCode);
@@ -42,30 +47,49 @@ MainWindow::MainWindow(QWidget *parent)
     fileListWidget->addItem("main.c");
     fileListWidget->addItem("utils.c");
     fileListWidget->addItem("functions.c");
-    fileListWidget->setMaximumWidth(150);  // 限制文件列表宽度
+    fileListWidget->setMaximumWidth(150);
 
-    // 创建右侧垂直分割器（编辑器 + 输出框）
-    QSplitter *rightSplitter = new QSplitter(Qt::Vertical, this);
-    rightSplitter->addWidget(ui->editor);
-    rightSplitter->addWidget(ui->outputTextEdit);
+    // 创建输入区域
+    QWidget *inputWidget = new QWidget(this);
+    QHBoxLayout *inputLayout = new QHBoxLayout(inputWidget);
+    inputLayout->setContentsMargins(0, 5, 0, 0);
 
-    // 设置分割比例（编辑器70%，输出框30%）
-    rightSplitter->setStretchFactor(0, 7);
-    rightSplitter->setStretchFactor(1, 3);
+    QLabel *inputLabel = new QLabel("输入:", this);
+    m_inputLineEdit = new QLineEdit(this);
+    QPushButton *sendButton = new QPushButton("发送", this);
 
-    // 创建主水平分割器（左侧文件列表 + 右侧分割器）
+    inputLayout->addWidget(inputLabel);
+    inputLayout->addWidget(m_inputLineEdit);
+    inputLayout->addWidget(sendButton);
+
+    // 连接发送按钮
+    connect(sendButton, &QPushButton::clicked, this, &MainWindow::onSendInput);
+    connect(m_inputLineEdit, &QLineEdit::returnPressed, this, &MainWindow::onSendInput);
+
+    // 初始时禁用输入区域
+    inputWidget->setEnabled(false);
+
+    // 创建右侧垂直布局（编辑器 + 输出框 + 输入区域）
+    QWidget *rightWidget = new QWidget(this);
+    QVBoxLayout *rightLayout = new QVBoxLayout(rightWidget);
+    rightLayout->setContentsMargins(0, 0, 0, 0);
+    rightLayout->addWidget(ui->editor);
+    rightLayout->addWidget(ui->outputTextEdit);
+    rightLayout->addWidget(inputWidget);
+
+    // 创建主水平分割器（左侧文件列表 + 右侧布局）
     QSplitter *mainSplitter = new QSplitter(Qt::Horizontal, this);
     mainSplitter->addWidget(fileListWidget);
-    mainSplitter->addWidget(rightSplitter);
+    mainSplitter->addWidget(rightWidget);
 
-    // 设置主分割比例（文件列表25%，编辑区75%）
+    // 设置主分割比例
     mainSplitter->setStretchFactor(0, 1);
     mainSplitter->setStretchFactor(1, 3);
 
     // 创建带边距的容器
     QWidget *container = new QWidget(this);
     QVBoxLayout *containerLayout = new QVBoxLayout(container);
-    containerLayout->setContentsMargins(10, 10, 10, 10);  // 设置10像素边距
+    containerLayout->setContentsMargins(10, 10, 10, 10);
     containerLayout->addWidget(mainSplitter);
 
     // 设置中央部件
@@ -90,6 +114,27 @@ MainWindow::MainWindow(QWidget *parent)
     // 连接文件列表点击事件
     connect(fileListWidget, &QListWidget::itemClicked,
             this, &MainWindow::onFileItemClicked);
+
+    // 设置停止按钮的快捷键和初始状态
+    ui->actionStop->setShortcut(QKeySequence(Qt::Key_Escape));
+    ui->actionStop->setEnabled(false);
+
+    // 保存输入区域组件指针
+    m_inputWidget = inputWidget;
+
+    // 连接运行状态变化信号，动态启用/禁用输入区域和停止按钮
+    connect(m_compiler, &Compiler::runStarted, this, [this]() {
+        ui->actionStop->setEnabled(true);
+        m_inputWidget->setEnabled(true); // 启用输入区域
+        m_inputLineEdit->setFocus(); // 焦点设置到输入框
+    });
+
+    connect(m_compiler, &Compiler::runFinished, this, [this](bool success, const QString &output) {
+        Q_UNUSED(success)
+        Q_UNUSED(output)
+        ui->actionStop->setEnabled(false);
+        m_inputWidget->setEnabled(false); // 禁用输入区域
+    });
 }
 
 // 析构函数：清理资源
@@ -386,6 +431,13 @@ void MainWindow::on_actionExit_triggered()
     qApp->quit();
 }
 
+void MainWindow::on_actionStop_triggered()
+{
+    // 调用编译器的停止方法
+    m_compiler->stopProgram();
+    statusBar()->showMessage("程序已停止");
+}
+
 // 编辑器内容变化处理
 void MainWindow::onEditorTextChanged()
 {
@@ -402,5 +454,20 @@ void MainWindow::onEditorTextChanged()
         }
         title += "*";  // 未保存标记
         setWindowTitle(title);
+    }
+}
+
+void MainWindow::onSendInput()
+{
+    QString input = m_inputLineEdit->text();
+    if (!input.isEmpty()) {
+        // 发送输入到运行中的程序
+        m_compiler->sendInput(input);
+
+        // 在输出框中显示输入内容
+        ui->outputTextEdit->appendPlainText("> " + input);
+
+        // 清空输入框
+        m_inputLineEdit->clear();
     }
 }
