@@ -316,8 +316,11 @@ void Editor::setupConnections() {
     }
   
     connect(this, &QPlainTextEdit::textChanged, this, &Editor::updateActionStates);
-
-}
+    QAction *commentAction = new QAction(this);
+            commentAction->setShortcut(QKeySequence("Ctrl+/"));
+            connect(commentAction, &QAction::triggered, this, &Editor::handleComment);
+            addAction(commentAction);
+        }
 
 // 更新编辑动作的启用状态
 void Editor::updateActionStates() {
@@ -524,4 +527,68 @@ void Editor::setTabReplace(bool replace, int spaces) {
         // 恢复默认Tab行为（8个空格宽度）
         setTabStopWidth(8 * fontMetrics().width(' '));
     }
+    // 在setupConnections()函数中添加快捷键连接
 }
+    void Editor::handleComment() {
+        QTextCursor cursor = textCursor();
+        bool hasSelection = cursor.hasSelection();
+
+        if (hasSelection) {
+            // 处理选中区域的注释
+            int start = cursor.selectionStart();
+            int end = cursor.selectionEnd();
+
+            // 移动到选中区域的起始行
+            cursor.setPosition(start);
+            cursor.movePosition(QTextCursor::StartOfLine);
+            int startLine = cursor.position();
+
+            // 移动到选中区域的结束行
+            cursor.setPosition(end);
+            cursor.movePosition(QTextCursor::EndOfLine);
+            int endLine = cursor.position();
+
+            // 选中所有要注释的行
+            cursor.setPosition(startLine);
+            cursor.setPosition(endLine, QTextCursor::KeepAnchor);
+            QString selectedText = cursor.selectedText();
+            QStringList lines = selectedText.split("\n");
+
+            // 检查是否已经是注释
+            bool isCommented = lines.first().trimmed().startsWith("//");
+
+            QString processedText;
+            if (isCommented) {
+                // 取消注释
+                foreach (QString line, lines) {
+                    processedText += line.replace(QRegExp("^\\s*//"), "") + "\n";
+                }
+            } else {
+                // 添加注释
+                foreach (QString line, lines) {
+                    processedText += "//" + line + "\n";
+                }
+            }
+
+            // 替换选中的文本
+            cursor.insertText(processedText.left(processedText.length() - 1)); // 移除最后一个换行
+            setTextCursor(cursor);
+        } else {
+            // 没有选中区域，注释当前行
+            cursor.movePosition(QTextCursor::StartOfLine);
+            cursor.movePosition(QTextCursor::EndOfLine, QTextCursor::KeepAnchor);
+            QString line = cursor.selectedText();
+
+            if (line.trimmed().startsWith("//")) {
+                // 取消注释
+                line = line.replace(QRegExp("^\\s*//"), "");
+            } else {
+                // 添加注释
+                line = "//" + line;
+            }
+
+            cursor.insertText(line);
+        }
+
+        highlightNewLines(); // 更新新增行标记
+    }
