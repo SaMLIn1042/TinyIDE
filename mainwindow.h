@@ -26,8 +26,6 @@ private:
     Editor *m_editor;
     Compiler *m_compiler;
     QString m_currentFilePath;
-    QListWidget *fileListWidget;
-    QMap<QString, QString> fileMap;
     QWidget *m_inputWidget;
     QLineEdit *m_inputLineEdit;
     bool m_isSaved;
@@ -46,8 +44,6 @@ private slots:
     void on_actionExit_triggered();
     void on_actionStop_triggered();
     void onEditorTextChanged();
-    void onFileItemClicked(QListWidgetItem *item);
-    void updateFileList();
     void onSendInput();
 };
 

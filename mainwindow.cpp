@@ -61,13 +61,6 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_editor, &QPlainTextEdit::textChanged,
             this, &MainWindow::onEditorTextChanged);
 
-    // 创建左侧文件列表
-    fileListWidget = new QListWidget(this);
-    fileListWidget->addItem("main.c");
-    fileListWidget->addItem("utils.c");
-    fileListWidget->addItem("functions.c");
-    fileListWidget->setMaximumWidth(150);
-
     // 设置输出框为只读模式
     ui->outputTextEdit->setReadOnly(true);
 
@@ -97,31 +90,16 @@ MainWindow::MainWindow(QWidget *parent)
     // 初始状态下禁用输入区域
     inputWidget->setEnabled(false);
 
-    // 创建右侧垂直布局（编辑器 + 输出框 + 输入区域）
-    QWidget *rightWidget = new QWidget(this);
-    QVBoxLayout *rightLayout = new QVBoxLayout(rightWidget);
-    rightLayout->setContentsMargins(0, 0, 0, 0);
-    rightLayout->addWidget(ui->editor);
-    rightLayout->addWidget(ui->outputTextEdit);
-    rightLayout->addWidget(inputWidget);
-
-    // 创建主水平分割器（左侧文件列表 + 右侧布局）
-    QSplitter *mainSplitter = new QSplitter(Qt::Horizontal, this);
-    mainSplitter->addWidget(fileListWidget);
-    mainSplitter->addWidget(rightWidget);
-
-    // 设置分割比例
-    mainSplitter->setStretchFactor(0, 1);
-    mainSplitter->setStretchFactor(1, 3);
-
-    // 创建带边距的容器
-    QWidget *container = new QWidget(this);
-    QVBoxLayout *containerLayout = new QVBoxLayout(container);
-    containerLayout->setContentsMargins(10, 10, 10, 10);
-    containerLayout->addWidget(mainSplitter);
+    // 创建主垂直布局（编辑器 + 输出框 + 输入区域）
+    QWidget *centralWidget = new QWidget(this);
+    QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
+    mainLayout->setContentsMargins(10, 10, 10, 10);
+    mainLayout->addWidget(ui->editor);
+    mainLayout->addWidget(ui->outputTextEdit);
+    mainLayout->addWidget(inputWidget);
 
     // 设置中央部件
-    setCentralWidget(container);
+    setCentralWidget(centralWidget);
 
     // 初始化编译器对象
     m_compiler = new Compiler(this);
@@ -138,10 +116,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 设置初始窗口标题
     setWindowTitle("TinyIDE - 未命名");
-
-    // 连接文件列表点击事件
-    connect(fileListWidget, &QListWidget::itemClicked,
-            this, &MainWindow::onFileItemClicked);
 
     // 设置停止按钮的快捷键和初始状态
     ui->actionStop->setShortcut(QKeySequence(Qt::Key_Escape));
@@ -171,82 +145,6 @@ MainWindow::MainWindow(QWidget *parent)
 MainWindow::~MainWindow()
 {
     delete ui;
-}
-
-// 更新文件列表（示例实现）
-void MainWindow::updateFileList()
-{
-    fileListWidget->clear();
-    fileMap.clear();
-
-    // 添加示例文件列表
-    QStringList files = {
-        "main.c",
-        "utils.c",
-        "functions.c",
-        "headers.h"};
-
-    // 创建模拟文件路径并添加到列表
-    foreach (const QString &file, files)
-    {
-        QString filePath = QDir::homePath() + "/TinyIDE/" + file;
-        fileMap[file] = filePath; // 存储文件名到路径的映射
-
-        QListWidgetItem *item = new QListWidgetItem(file);
-        fileListWidget->addItem(item);
-    }
-}
-
-// 文件列表项点击处理
-void MainWindow::onFileItemClicked(QListWidgetItem *item)
-{
-    QString fileName = item->text();
-    QString filePath = fileMap.value(fileName);
-
-    // 检查文件路径有效性
-    if (filePath.isEmpty())
-    {
-        QMessageBox::warning(this, "文件错误", "无法找到文件路径");
-        return;
-    }
-
-    // 检查未保存的更改
-    if (!m_isSaved)
-    {
-        QMessageBox::StandardButton reply;
-        reply = QMessageBox::question(this, "保存提示",
-                                      "当前文件有未保存的更改，是否保存？",
-                                      QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
-        if (reply == QMessageBox::Cancel)
-        {
-            return; // 取消操作
-        }
-        else if (reply == QMessageBox::Save)
-        {
-            if (!on_actionSave_triggered())
-            {
-                return; // 保存失败取消操作
-            }
-        }
-    }
-
-    // 打开并读取文件
-    QFile file(filePath);
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
-    {
-        QMessageBox::critical(this, "错误", "无法打开文件: " + file.errorString());
-        return;
-    }
-
-    // 显示文件内容
-    QTextStream in(&file);
-    m_editor->setPlainText(in.readAll());
-    file.close();
-
-    // 更新文件状态
-    m_currentFilePath = filePath;
-    m_isSaved = true;
-    setWindowTitle("TinyIDE - " + fileName);
 }
 
 // 编译操作处理
