@@ -162,10 +162,17 @@ void Compiler::compile(const QString &sourceCode)
 void Compiler::runProgram()
 {
     // 检查编译状态和可执行文件
-    if (!m_compileSuccess || !QFile::exists(m_executablePath))
-    {
+    if (!m_compileSuccess) {
         emit runOutput("错误：请先成功编译程序");
-        emit runFinished(false, "未找到可执行文件");
+        emit runFinished(false, "编译未成功");
+        return;
+    }
+
+    // 添加额外的可执行文件存在检查
+    if (!QFile::exists(m_executablePath)) {
+        emit runOutput("错误：可执行文件不存在，请重新编译");
+        emit runFinished(false, "可执行文件不存在");
+        m_compileSuccess = false; // 重置编译状态
         return;
     }
 

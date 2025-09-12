@@ -15,6 +15,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QLabel>
+#include <QTimer>
 
 // 主窗口构造函数，初始化UI和核心组件
 MainWindow::MainWindow(QWidget *parent)
@@ -43,6 +44,11 @@ MainWindow::MainWindow(QWidget *parent)
     connect(aClear, SIGNAL(triggered()), m_editor, SLOT(clearAllHighlights()));
     // -------------------------------------------------
 
+    // 创建标签页控件
+    m_tabWidget = new QTabWidget(this);
+    m_tabWidget->setTabsClosable(true); // 允许关闭标签
+    m_tabWidget->setMovable(true);      // 允许拖动标签
+
     // 设置初始示例代码
     QString initialCode =
         "#include <stdio.h>\n\n"
@@ -52,14 +58,28 @@ MainWindow::MainWindow(QWidget *parent)
         "    scanf(\"%d\");\n"
         "    return 0;\n"
         "}";
-    m_editor->setPlainText(initialCode);
-    m_editor->setProperty("originalText", initialCode);
-    // 初始化原始文本用于跟踪新增行
-    m_editor->setOriginalText(initialCode);
+    // 创建第一个标签页
+    Editor *editor = new Editor();
+    editor->setPlainText(initialCode);
+    editor->setOriginalText(initialCode);
 
     // 连接编辑器内容变化信号
-    connect(m_editor, &QPlainTextEdit::textChanged,
+    connect(editor, &QPlainTextEdit::textChanged,
             this, &MainWindow::onEditorTextChanged);
+
+    // 添加到标签页
+    m_tabWidget->addTab(editor, "未命名");
+
+    // 存储标签页信息
+    FileTabInfo info;
+    info.editor = editor;
+    info.filePath = "";
+    info.isSaved = true;
+    info.displayName = "未命名";
+    m_tabInfos.append(info);
+
+    // 设置当前标签页索引
+    m_currentTabIndex = 0;
 
     // 设置输出框为只读模式
     ui->outputTextEdit->setReadOnly(true);
@@ -90,11 +110,11 @@ MainWindow::MainWindow(QWidget *parent)
     // 初始状态下禁用输入区域
     inputWidget->setEnabled(false);
 
-    // 创建主垂直布局（编辑器 + 输出框 + 输入区域）
+    // 创建主垂直布局（标签页 + 输出框 + 输入区域）
     QWidget *centralWidget = new QWidget(this);
     QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
     mainLayout->setContentsMargins(10, 10, 10, 10);
-    mainLayout->addWidget(ui->editor);
+    mainLayout->addWidget(m_tabWidget);
     mainLayout->addWidget(ui->outputTextEdit);
     mainLayout->addWidget(inputWidget);
 
@@ -121,6 +141,10 @@ MainWindow::MainWindow(QWidget *parent)
     ui->actionStop->setShortcut(QKeySequence(Qt::Key_Escape));
     ui->actionStop->setEnabled(false);
 
+    // 连接标签页信号
+    connect(m_tabWidget, &QTabWidget::currentChanged, this, &MainWindow::onTabChanged);
+    connect(m_tabWidget, &QTabWidget::tabCloseRequested, this, &MainWindow::onTabCloseRequested);
+
     // 保存输入区域组件指针
     m_inputWidget = inputWidget;
 
@@ -139,6 +163,11 @@ MainWindow::MainWindow(QWidget *parent)
                 ui->actionStop->setEnabled(false);
                 m_inputWidget->setEnabled(false); // 禁用输入区域
             });
+
+    // 延迟调用，确保编辑器能够找到主窗口
+    QTimer::singleShot(100, this, [this, editor]() {
+        editor->findActionsFromMainWindow();
+    });
 }
 
 // 析构函数：清理资源
@@ -147,21 +176,105 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
+// 标签页切换处理
+void MainWindow::onTabChanged(int index)
+{
+    if (index < 0 || index >= m_tabInfos.size()) return;
+
+    m_currentTabIndex = index;
+    FileTabInfo &info = m_tabInfos[index];
+
+    // 更新窗口标题
+    setWindowTitle("TinyIDE - " + info.displayName + (info.isSaved ? "" : "*"));
+}
+
+// 标签页关闭请求处理
+void MainWindow::onTabCloseRequested(int index)
+{
+    if (index < 0 || index >= m_tabInfos.size()) return;
+
+    FileTabInfo &info = m_tabInfos[index];
+
+    // 检查未保存的更改
+    if (!info.isSaved)
+    {
+        QString fileName = info.filePath.isEmpty() ? "未命名文件" : QFileInfo(info.filePath).fileName();
+        QMessageBox::StandardButton reply;
+        reply = QMessageBox::question(this, "保存提示",
+                                      QString("%1 已修改，是否保存？").arg(fileName),
+                                      QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+
+        if (reply == QMessageBox::Cancel)
+        {
+            return; // 取消关闭
+        }
+        else if (reply == QMessageBox::Save)
+        {
+            // 保存当前文件
+            m_currentTabIndex = index;
+            if (!on_actionSave_triggered())
+            {
+                return; // 保存失败取消关闭
+            }
+        }
+    }
+
+    // 移除标签页
+    m_tabWidget->removeTab(index);
+    delete info.editor;
+    m_tabInfos.remove(index);
+
+    // 如果关闭的是当前标签页，更新当前索引
+    if (m_currentTabIndex >= index) {
+        m_currentTabIndex--;
+    }
+
+    // 如果没有标签页了，创建一个新的
+    if (m_tabInfos.isEmpty()) {
+        on_actionNew_triggered();
+    }
+}
+
+// 更新标签页标题
+void MainWindow::updateTabTitle(int index)
+{
+    if (index < 0 || index >= m_tabInfos.size()) return;
+
+    FileTabInfo &info = m_tabInfos[index];
+    QString title = info.displayName + (info.isSaved ? "" : "*");
+    m_tabWidget->setTabText(index, title);
+}
+
 // 编译操作处理
 void MainWindow::on_actionCompile_triggered()
 {
+    Editor* editor = currentEditor();
+    if (!editor) return;
+
     // 添加编译分隔线
     ui->outputTextEdit->appendPlainText("\n--- 开始编译 ---");
     statusBar()->showMessage("编译中...");
 
     // 获取并编译当前代码
-    QString code = m_editor->getCodeText();
+    QString code = editor->getCodeText();
     m_compiler->compile(code);
+}
+
+// 获取当前活动的编辑器
+Editor* MainWindow::currentEditor() const
+{
+    if (m_currentTabIndex >= 0 && m_currentTabIndex < m_tabInfos.size()) {
+        return m_tabInfos[m_currentTabIndex].editor;
+    }
+    return nullptr;
 }
 
 // 运行操作处理
 void MainWindow::on_actionRun_triggered()
 {
+    Editor* editor = currentEditor();
+    if (!editor) return;
+
     ui->outputTextEdit->appendPlainText("\n--- 运行程序 ---");
     statusBar()->showMessage("运行中...");
     m_compiler->runProgram();
@@ -203,56 +316,64 @@ void MainWindow::handleRunOutput(const QString &output)
 // 新建文件处理
 void MainWindow::on_actionNew_triggered()
 {
-    // 检查未保存的更改
-    if (!m_isSaved)
-    {
-        QMessageBox::StandardButton reply;
-        reply = QMessageBox::question(this, "保存提示",
-                                      "当前文件有未保存的更改，是否保存？",
-                                      QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
-        if (reply == QMessageBox::Cancel)
-        {
-            return;
-        }
-        else if (reply == QMessageBox::Save)
-        {
-            if (!on_actionSave_triggered())
-            {
-                return;
+    // 创建新编辑器
+    Editor *editor = new Editor();
+
+    // 设置初始示例代码
+    QString initialCode =
+        "#include <stdio.h>\n\n"
+        "int main() {\n"
+        "    printf(\"Hello, World!\\n\");\n"
+        "    return 0;\n"
+        "}";
+    editor->setPlainText(initialCode);
+    editor->setOriginalText(initialCode);
+
+    // 连接编辑器内容变化信号 - 使用lambda确保正确绑定
+    connect(editor, &QPlainTextEdit::textChanged, this, [this, editor]() {
+        // 直接调用处理函数，但传递正确的编辑器
+        for (int i = 0; i < m_tabInfos.size(); ++i) {
+            if (m_tabInfos[i].editor == editor) {
+                FileTabInfo &info = m_tabInfos[i];
+                if (info.isSaved) {
+                    info.isSaved = false;
+                    updateTabTitle(i);
+                    if (i == m_currentTabIndex) {
+                        setWindowTitle("TinyIDE - " + info.displayName + "*");
+                    }
+                }
+                break;
             }
         }
-    }
+    });
 
-    // 重置编辑器状态
-    m_editor->clear();
-    m_currentFilePath = "";
-    m_isSaved = true;
+    // 添加到标签页
+    int newIndex = m_tabWidget->addTab(editor, "未命名");
+
+    // 存储标签页信息
+    FileTabInfo info;
+    info.editor = editor;
+    info.filePath = "";
+    info.isSaved = true;
+    info.displayName = "未命名";
+    m_tabInfos.append(info);
+
+    // 延迟调用，确保编辑器能够找到主窗口
+    QTimer::singleShot(100, this, [editor]() {
+        editor->findActionsFromMainWindow();
+    });
+
+    // 切换到新标签页
+    m_tabWidget->setCurrentIndex(newIndex);
+    m_currentTabIndex = newIndex;
+
+    // 更新窗口标题
     setWindowTitle("TinyIDE - 未命名");
-    ui->outputTextEdit->clear(); // 清空输出框
 }
 
 // 打开文件处理
 void MainWindow::on_actionOpen_triggered()
 {
-    // 检查未保存的更改
-    if (!m_isSaved)
-    {
-        QMessageBox::StandardButton reply = QMessageBox::question(
-            this, "保存提示", "当前文件有未保存的更改，是否保存？",
-            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
-        if (reply == QMessageBox::Cancel)
-        {
-            return;
-        }
-        else if (reply == QMessageBox::Save)
-        {
-            if (!on_actionSave_triggered())
-            {
-                return;
-            }
-        }
-    }
-
     // 显示文件选择对话框
     QString filePath = QFileDialog::getOpenFileName(
         this, "打开文件", QDir::homePath(), "C源文件 (*.c);;所有文件 (*)");
@@ -269,28 +390,61 @@ void MainWindow::on_actionOpen_triggered()
         return;
     }
 
+    // 创建新编辑器
+    Editor *editor = new Editor();
+
     // 显示文件内容
     QTextStream in(&file);
-    m_editor->setPlainText(in.readAll());
+    editor->setPlainText(in.readAll());
+    editor->setOriginalText(in.readAll());
     file.close();
 
-    // 更新文件状态
-    m_currentFilePath = filePath;
-    m_isSaved = true;
-    setWindowTitle("TinyIDE - " + QFileInfo(filePath).fileName());
+    // 连接编辑器内容变化信号
+    connect(editor, &QPlainTextEdit::textChanged,
+            this, &MainWindow::onEditorTextChanged);
+
+    // 获取文件名
+    QString fileName = QFileInfo(filePath).fileName();
+
+    // 添加到标签页
+    int newIndex = m_tabWidget->addTab(editor, fileName);
+
+    // 存储标签页信息
+    FileTabInfo info;
+    info.editor = editor;
+    info.filePath = filePath;
+    info.isSaved = true;
+    info.displayName = fileName;
+    m_tabInfos.append(info);
+
+    // 延迟调用，确保编辑器能够找到主窗口
+    QTimer::singleShot(100, this, [editor]() {
+        editor->findActionsFromMainWindow();
+    });
+
+    // 切换到新标签页
+    m_tabWidget->setCurrentIndex(newIndex);
+    m_currentTabIndex = newIndex;
+
+    // 更新窗口标题
+    setWindowTitle("TinyIDE - " + fileName);
 }
 
 // 保存文件处理
 bool MainWindow::on_actionSave_triggered()
 {
+    if (m_currentTabIndex < 0 || m_currentTabIndex >= m_tabInfos.size()) return false;
+
+    FileTabInfo &info = m_tabInfos[m_currentTabIndex];
+
     // 无路径时调用另存为
-    if (m_currentFilePath.isEmpty())
+    if (info.filePath.isEmpty())
     {
         return on_actionSaveAs_triggered();
     }
 
     // 写入文件
-    QFile file(m_currentFilePath);
+    QFile file(info.filePath);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
     {
         QMessageBox::critical(this, "错误", "无法保存文件: " + file.errorString());
@@ -298,15 +452,17 @@ bool MainWindow::on_actionSave_triggered()
     }
 
     QTextStream out(&file);
-    out << m_editor->getCodeText();
+    out << info.editor->getCodeText();
     file.close();
-    m_editor->setOriginalText(m_editor->getCodeText());
+    info.editor->setOriginalText(info.editor->getCodeText());
 
     // 更新保存状态
-    m_isSaved = true;
-    statusBar()->showMessage("文件已保存: " + m_currentFilePath);
-    // 更新窗口标题为当前文件名
-    setWindowTitle("TinyIDE - " + QFileInfo(m_currentFilePath).fileName());
+    info.isSaved = true;
+    updateTabTitle(m_currentTabIndex);
+    statusBar()->showMessage("文件已保存: " + info.filePath);
+
+    // 更新窗口标题
+    setWindowTitle("TinyIDE - " + info.displayName);
 
     return true;
 }
@@ -314,6 +470,10 @@ bool MainWindow::on_actionSave_triggered()
 // 另存为文件处理
 bool MainWindow::on_actionSaveAs_triggered()
 {
+    if (m_currentTabIndex < 0 || m_currentTabIndex >= m_tabInfos.size()) return false;
+
+    FileTabInfo &info = m_tabInfos[m_currentTabIndex];
+
     // 显示保存对话框
     QString filePath = QFileDialog::getSaveFileName(
         this, "另存为", QDir::homePath(), "C源文件 (*.c);;所有文件 (*)");
@@ -329,13 +489,12 @@ bool MainWindow::on_actionSaveAs_triggered()
     }
 
     // 更新路径并保存
-    m_currentFilePath = filePath;
+    info.filePath = filePath;
+    info.displayName = QFileInfo(filePath).fileName();
     bool result = on_actionSave_triggered();
-    // 保存成功后，更新原始文本基准
-    if (result)
-    {
-        m_editor->setOriginalText(m_editor->getCodeText());
-    }
+
+    // 更新标签页标题
+    updateTabTitle(m_currentTabIndex);
 
     return result;
 }
@@ -343,57 +502,38 @@ bool MainWindow::on_actionSaveAs_triggered()
 // 关闭文件处理
 void MainWindow::on_actionClose_triggered()
 {
-    // 检查未保存的更改
-    if (!m_isSaved)
-    {
-        QString fileName = m_currentFilePath.isEmpty() ? "未命名文件" : QFileInfo(m_currentFilePath).fileName();
-        QMessageBox::StandardButton reply;
-        reply = QMessageBox::question(this, "保存提示",
-                                      QString("%1 已修改，是否保存？").arg(fileName),
-                                      QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+    if (m_currentTabIndex < 0 || m_currentTabIndex >= m_tabInfos.size()) return;
 
-        if (reply == QMessageBox::Cancel)
-        {
-            return;
-        }
-        else if (reply == QMessageBox::Save)
-        {
-            if (!on_actionSave_triggered())
-            {
-                return;
-            }
-        }
-    }
-
-    // 重置编辑器状态
-    m_editor->clear();
-    m_currentFilePath.clear();
-    m_isSaved = false;
-    setWindowTitle("TinyIDE");
-    statusBar()->showMessage("文件已关闭");
+    // 触发关闭当前标签页
+    onTabCloseRequested(m_currentTabIndex);
 }
 
 // 退出应用处理
 void MainWindow::on_actionExit_triggered()
 {
-    // 检查未保存的更改
-    if (!m_isSaved)
+    // 检查所有标签页是否有未保存的更改
+    for (int i = 0; i < m_tabInfos.size(); ++i)
     {
-        QString fileName = m_currentFilePath.isEmpty() ? "未命名文件" : QFileInfo(m_currentFilePath).fileName();
-        QMessageBox::StandardButton reply;
-        reply = QMessageBox::question(this, "保存提示",
-                                      QString("%1 已修改，是否保存？").arg(fileName),
-                                      QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+        if (!m_tabInfos[i].isSaved)
+        {
+            QString fileName = m_tabInfos[i].filePath.isEmpty() ? "未命名文件" : QFileInfo(m_tabInfos[i].filePath).fileName();
+            QMessageBox::StandardButton reply;
+            reply = QMessageBox::question(this, "保存提示",
+                                          QString("%1 已修改，是否保存？").arg(fileName),
+                                          QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
 
-        if (reply == QMessageBox::Cancel)
-        {
-            return;
-        }
-        else if (reply == QMessageBox::Save)
-        {
-            if (!on_actionSave_triggered())
+            if (reply == QMessageBox::Cancel)
             {
-                return;
+                return; // 取消退出
+            }
+            else if (reply == QMessageBox::Save)
+            {
+                m_currentTabIndex = i;
+                m_tabWidget->setCurrentIndex(i);
+                if (!on_actionSave_triggered())
+                {
+                    return; // 保存失败取消退出
+                }
             }
         }
     }
@@ -413,23 +553,27 @@ void MainWindow::on_actionStop_triggered()
 // 编辑器内容变化处理
 void MainWindow::onEditorTextChanged()
 {
-    // 标记文件为未保存状态
-    if (m_isSaved)
-    {
-        m_isSaved = false;
+    // 确定是哪个编辑器发出的信号
+    Editor* senderEditor = qobject_cast<Editor*>(sender());
+    if (!senderEditor) return;
 
-        // 在窗口标题添加*标记
-        QString title = "TinyIDE - ";
-        if (m_currentFilePath.isEmpty())
-        {
-            title += "未命名";
+    // 找到对应的标签页
+    for (int i = 0; i < m_tabInfos.size(); ++i) {
+        if (m_tabInfos[i].editor == senderEditor) {
+            FileTabInfo &info = m_tabInfos[i];
+
+            // 标记文件为未保存状态
+            if (info.isSaved) {
+                info.isSaved = false;
+                updateTabTitle(i);
+
+                // 如果是当前标签页，更新窗口标题
+                if (i == m_currentTabIndex) {
+                    setWindowTitle("TinyIDE - " + info.displayName + "*");
+                }
+            }
+            break;
         }
-        else
-        {
-            title += QFileInfo(m_currentFilePath).fileName();
-        }
-        title += "*"; // 未保存标记
-        setWindowTitle(title);
     }
 }
 

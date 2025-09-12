@@ -25,7 +25,7 @@ public:
 
     void highlightNewLines();
     void setOriginalText(const QString &text);
-
+    void findActionsFromMainWindow();
     void setHighlightActions(QAction *highlight, QAction *clear);//高亮
     void clearHighlights();
 
@@ -101,7 +101,7 @@ private:
     QVector<QTextCursor> m_matchCursors;
     int m_currentMatchIndex = -1;
 
-    void findActionsFromMainWindow();
+
     void setupConnections();
     void updateActionStates();
     void replaceCurrent(const QString &searchText, const QString &replaceText);
