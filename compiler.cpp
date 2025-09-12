@@ -8,11 +8,12 @@
 #include <QRegularExpression>
 #include <QRegularExpressionMatch>
 
+// 编译器构造函数
 Compiler::Compiler(QObject *parent)
     : QObject(parent),
       m_process(new QProcess(this)),    // 编译进程
       m_runProcess(new QProcess(this)), // 运行进程
-      m_compileSuccess(false)           // 初始编译状态为失败
+      m_compileSuccess(false)           // 初始编译状态
 {
     // 连接编译进程完成信号
     connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
@@ -23,6 +24,7 @@ Compiler::Compiler(QObject *parent)
             this, &Compiler::onRunProcessFinished);
 }
 
+// 编译器析构函数
 Compiler::~Compiler()
 {
     // 确保所有进程在析构时终止
@@ -38,15 +40,16 @@ Compiler::~Compiler()
     }
 }
 
+// 编译源代码
 void Compiler::compile(const QString &sourceCode)
 {
     m_compileSuccess = false; // 重置编译状态
     m_process->close();       // 关闭之前的编译进程
 
-    // ===== 核心修改：自动插入行缓冲设置 =====
+    // 预处理源代码：添加必要头文件和行缓冲设置
     QString modifiedCode = sourceCode;
 
-    // 1. 确保包含必要头文件
+    // 确保包含必要头文件
     if (!modifiedCode.contains("#include <stdio.h>"))
     {
         modifiedCode.prepend("#include <stdio.h>\n");
@@ -56,7 +59,7 @@ void Compiler::compile(const QString &sourceCode)
         modifiedCode.prepend("#include <stdlib.h>\n");
     }
 
-    // 2. 在 main() 函数开头插入行缓冲设置
+    // 在main()函数开头插入行缓冲设置
     QRegularExpression mainRegex(R"(int\s+main\s*\([^)]*\)\s*\{)");
     QRegularExpressionMatch match = mainRegex.match(modifiedCode);
 
@@ -68,7 +71,7 @@ void Compiler::compile(const QString &sourceCode)
     }
     else
     {
-        // 处理 void main() 等非标准形式
+        // 处理void main()等非标准形式
         mainRegex.setPattern(R"(void\s+main\s*\([^)]*\)\s*\{)");
         match = mainRegex.match(modifiedCode);
         if (match.hasMatch())
@@ -79,7 +82,7 @@ void Compiler::compile(const QString &sourceCode)
         }
     }
 
-    // 检查临时目录是否存在
+    // 检查临时目录
     QDir tempDir(QDir::tempPath());
     if (!tempDir.exists())
     {
@@ -87,7 +90,7 @@ void Compiler::compile(const QString &sourceCode)
         return;
     }
 
-    // 生成唯一的临时文件名
+    // 生成唯一临时文件名
     QString tempFileName = QString("TinyIDE_%1_%2.c")
                                .arg(QCoreApplication::applicationPid())
                                .arg(qrand());
@@ -112,7 +115,7 @@ void Compiler::compile(const QString &sourceCode)
     out << modifiedCode;
     file.close();
 
-    // 验证文件是否创建成功
+    // 验证文件创建
     if (!QFile::exists(tempFilePath))
     {
         emit compileFinished(false, "错误：临时文件创建失败: " + tempFilePath);
@@ -141,7 +144,7 @@ void Compiler::compile(const QString &sourceCode)
     // 启动编译进程
     m_process->start("gcc", arguments);
 
-    // 检查进程是否成功启动
+    // 检查进程启动
     if (!m_process->waitForStarted(3000))
     {
         QString error = "错误：无法启动编译器\n";
@@ -155,9 +158,10 @@ void Compiler::compile(const QString &sourceCode)
     m_tempFilePath = tempFilePath;
 }
 
+// 运行程序
 void Compiler::runProgram()
 {
-    // 检查是否已成功编译
+    // 检查编译状态和可执行文件
     if (!m_compileSuccess || !QFile::exists(m_executablePath))
     {
         emit runOutput("错误：请先成功编译程序");
@@ -188,7 +192,7 @@ void Compiler::runProgram()
         QString error = QString::fromLocal8Bit(m_runProcess->readAllStandardError());
         emit runOutput("[ERROR] " + error); });
 
-    // 设置工作目录为可执行文件所在目录
+    // 设置工作目录
     QFileInfo exeInfo(m_executablePath);
     m_runProcess->setWorkingDirectory(exeInfo.path());
 
@@ -198,7 +202,7 @@ void Compiler::runProgram()
     // 启动程序
     m_runProcess->start(m_executablePath);
 
-    // 检查是否成功启动
+    // 检查启动状态
     if (!m_runProcess->waitForStarted(1000))
     {
         emit runOutput("启动失败: " + m_runProcess->errorString());
@@ -208,6 +212,7 @@ void Compiler::runProgram()
     emit runStarted();
 }
 
+// 发送输入到运行中的程序
 void Compiler::sendInput(const QString &input)
 {
     if (m_runProcess && m_runProcess->state() == QProcess::Running)
@@ -217,27 +222,29 @@ void Compiler::sendInput(const QString &input)
     }
 }
 
+// 停止运行中的程序
 void Compiler::stopProgram()
 {
-    // 检查运行进程是否正在运行
+    // 检查运行状态
     if (m_runProcess->state() != QProcess::NotRunning)
     {
         // 终止运行进程
         m_runProcess->kill();
         m_runProcess->waitForFinished();
 
-        // 发送程序被终止的信号
+        // 发送终止信号
         emit runFinished(false, "程序已被用户终止");
     }
 }
 
+// 编译进程完成处理
 void Compiler::onProcessFinished(int exitCode, QProcess::ExitStatus)
 {
     // 获取编译输出
     QString output = m_process->readAllStandardOutput() +
                      m_process->readAllStandardError();
 
-    // 检查编译是否成功
+    // 检查编译结果
     m_compileSuccess = (exitCode == 0 && QFile::exists(m_executablePath));
 
     // 生成结果消息
@@ -256,6 +263,7 @@ void Compiler::onProcessFinished(int exitCode, QProcess::ExitStatus)
     emit compileFinished(m_compileSuccess, result);
 }
 
+// 运行进程完成处理
 void Compiler::onRunProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
     Q_UNUSED(exitStatus) // 未使用参数
@@ -275,9 +283,10 @@ void Compiler::onRunProcessFinished(int exitCode, QProcess::ExitStatus exitStatu
         result += "错误:\n" + error;
     }
 
+    // 清理可执行文件
     if (!m_executablePath.isEmpty() && QFile::exists(m_executablePath))
     {
-        QFile::remove(m_executablePath); // 删除可执行文件
+        QFile::remove(m_executablePath);
     }
 
     // 发送运行完成信号

@@ -16,7 +16,7 @@
 #include <QPushButton>
 #include <QLabel>
 
-// 初始化UI和核心组件
+// 主窗口构造函数，初始化UI和核心组件
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow),
       m_currentFilePath(""),
@@ -24,7 +24,7 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
-    //高亮相关，这里对mainwindow进行了修改（1/2）-----------------
+    // 高亮功能相关操作 - 第一部分
     QAction *aHighlight = new QAction(tr("高亮所选"), this);
     aHighlight->setObjectName("actionHighlightSelection");
     ui->toolBar->addAction(aHighlight);
@@ -32,16 +32,16 @@ MainWindow::MainWindow(QWidget *parent)
     QAction *aClear = new QAction(tr("清除高亮"), this);
     aClear->setObjectName("actionClearHighlights");
     ui->toolBar->addAction(aClear);
-    //-------------------------------------------------
+    // -------------------------------------------------
 
-    // 获取编辑器组件
+    // 获取编辑器组件引用
     m_editor = ui->editor;
 
-    //高亮相关，这里对mainwindow进行了修改（2/2）-----------------
+    // 高亮功能相关操作 - 第二部分
     m_editor->setHighlightActions(aHighlight, aClear);
     connect(aHighlight, SIGNAL(triggered()), m_editor, SLOT(highlightSelection()));
-    connect(aClear,     SIGNAL(triggered()), m_editor, SLOT(clearAllHighlights()));
-    //-------------------------------------------------
+    connect(aClear, SIGNAL(triggered()), m_editor, SLOT(clearAllHighlights()));
+    // -------------------------------------------------
 
     // 设置初始示例代码
     QString initialCode =
@@ -54,8 +54,8 @@ MainWindow::MainWindow(QWidget *parent)
         "}";
     m_editor->setPlainText(initialCode);
     m_editor->setProperty("originalText", initialCode);
-    // 在Editor类中可以添加一个setOriginalText方法来设置m_originalText
-    m_editor->setOriginalText(initialCode); // 初始化原始文本用于跟踪新增行
+    // 初始化原始文本用于跟踪新增行
+    m_editor->setOriginalText(initialCode);
 
     // 连接编辑器内容变化信号
     connect(m_editor, &QPlainTextEdit::textChanged,
@@ -68,16 +68,16 @@ MainWindow::MainWindow(QWidget *parent)
     fileListWidget->addItem("functions.c");
     fileListWidget->setMaximumWidth(150);
 
-    // 设置为只读（禁止编辑）
+    // 设置输出框为只读模式
     ui->outputTextEdit->setReadOnly(true);
 
-    // 禁用文本编辑功能（防止通过上下文菜单修改）
+    // 禁用输出框的撤销/重做功能
     ui->outputTextEdit->setUndoRedoEnabled(false);
 
-    // 禁用拖放功能（防止拖入内容）
+    // 禁用输出框的拖放功能
     ui->outputTextEdit->setAcceptDrops(false);
 
-    // 创建输入区域
+    // 创建程序输入区域
     QWidget *inputWidget = new QWidget(this);
     QHBoxLayout *inputLayout = new QHBoxLayout(inputWidget);
     inputLayout->setContentsMargins(0, 5, 0, 0);
@@ -90,11 +90,11 @@ MainWindow::MainWindow(QWidget *parent)
     inputLayout->addWidget(m_inputLineEdit);
     inputLayout->addWidget(sendButton);
 
-    // 连接发送按钮
+    // 连接输入发送按钮和回车键事件
     connect(sendButton, &QPushButton::clicked, this, &MainWindow::onSendInput);
     connect(m_inputLineEdit, &QLineEdit::returnPressed, this, &MainWindow::onSendInput);
 
-    // 初始时禁用输入区域
+    // 初始状态下禁用输入区域
     inputWidget->setEnabled(false);
 
     // 创建右侧垂直布局（编辑器 + 输出框 + 输入区域）
@@ -110,7 +110,7 @@ MainWindow::MainWindow(QWidget *parent)
     mainSplitter->addWidget(fileListWidget);
     mainSplitter->addWidget(rightWidget);
 
-    // 设置主分割比例
+    // 设置分割比例
     mainSplitter->setStretchFactor(0, 1);
     mainSplitter->setStretchFactor(1, 3);
 
@@ -407,7 +407,7 @@ bool MainWindow::on_actionSave_triggered()
     // 更新保存状态
     m_isSaved = true;
     statusBar()->showMessage("文件已保存: " + m_currentFilePath);
-    // 添加：更新窗口标题为当前文件名
+    // 更新窗口标题为当前文件名
     setWindowTitle("TinyIDE - " + QFileInfo(m_currentFilePath).fileName());
 
     return true;
@@ -434,7 +434,8 @@ bool MainWindow::on_actionSaveAs_triggered()
     m_currentFilePath = filePath;
     bool result = on_actionSave_triggered();
     // 保存成功后，更新原始文本基准
-    if (result) {
+    if (result)
+    {
         m_editor->setOriginalText(m_editor->getCodeText());
     }
 
@@ -503,6 +504,7 @@ void MainWindow::on_actionExit_triggered()
     qApp->quit();
 }
 
+// 停止程序运行
 void MainWindow::on_actionStop_triggered()
 {
     // 调用编译器的停止方法
@@ -533,6 +535,7 @@ void MainWindow::onEditorTextChanged()
     }
 }
 
+// 发送输入到运行中的程序
 void MainWindow::onSendInput()
 {
     QString input = m_inputLineEdit->text();
