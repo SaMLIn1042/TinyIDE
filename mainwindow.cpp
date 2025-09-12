@@ -24,8 +24,24 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
+    //高亮相关，这里对mainwindow进行了修改（1/2）-----------------
+    QAction *aHighlight = new QAction(tr("高亮所选"), this);
+    aHighlight->setObjectName("actionHighlightSelection");
+    ui->toolBar->addAction(aHighlight);
+
+    QAction *aClear = new QAction(tr("清除高亮"), this);
+    aClear->setObjectName("actionClearHighlights");
+    ui->toolBar->addAction(aClear);
+    //-------------------------------------------------
+
     // 获取编辑器组件
     m_editor = ui->editor;
+
+    //高亮相关，这里对mainwindow进行了修改（2/2）-----------------
+    m_editor->setHighlightActions(aHighlight, aClear);
+    connect(aHighlight, SIGNAL(triggered()), m_editor, SLOT(highlightSelection()));
+    connect(aClear,     SIGNAL(triggered()), m_editor, SLOT(clearAllHighlights()));
+    //-------------------------------------------------
 
     // 设置初始示例代码
     QString initialCode =

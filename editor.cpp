@@ -194,8 +194,57 @@ void Editor::highlightCurrentLine()
         }
     }
 
+    // --- 查找匹配高亮（新增） ---
+    // 所有匹配使用较浅的颜色
+    for (int i = 0; i < m_matchCursors.size(); ++i)
+    {
+        const QTextCursor &mc = m_matchCursors[i];
+        if (mc.isNull()) continue;
+        QTextEdit::ExtraSelection matchSel;
+        QColor matchColor = QColor(Qt::cyan).lighter(180);
+        matchSel.format.setBackground(matchColor);
+        matchSel.cursor = mc; // 保持选区
+        extraSelections.append(matchSel);
+    }
+
+    // 当前匹配用更醒目的颜色覆盖
+    if (m_currentMatchIndex >= 0 && m_currentMatchIndex < m_matchCursors.size())
+    {
+        QTextCursor cur = m_matchCursors[m_currentMatchIndex];
+        if (!cur.isNull())
+        {
+            QTextEdit::ExtraSelection curSel;
+            QColor curColor = QColor(Qt::blue).lighter(170);
+            curSel.format.setBackground(curColor);
+            curSel.cursor = cur;
+            extraSelections.append(curSel);
+
+            // 将视图滚动到当前匹配
+            // 将视图滚动到当前匹配并尽量居中显示（替换 ensureVisible(...)）
+            QRect r = cursorRect(cur);
+            QScrollBar *hbar = horizontalScrollBar();
+            QScrollBar *vbar = verticalScrollBar();
+
+            int centerX = r.center().x();
+            int centerY = r.center().y();
+
+            // 计算新的滚动位置（以使匹配项位于视口中心）
+            int newH = hbar->value() + centerX - viewport()->width() / 2;
+            int newV = vbar->value() + centerY - viewport()->height() / 2;
+
+            // 限制在合理范围内
+            newH = qBound(hbar->minimum(), newH, hbar->maximum());
+            newV = qBound(vbar->minimum(), newV, vbar->maximum());
+
+            hbar->setValue(newH);
+            vbar->setValue(newV);
+
+        }
+    }
+
     setExtraSelections(extraSelections);
 }
+
 // 新增：设置原始文本（用于跟踪新增内容）
 void Editor::setOriginalText(const QString &text)
 {
@@ -272,6 +321,14 @@ void Editor::findActionsFromMainWindow()
         { // 新增：关联字体设置动作
             fontAction = action;
         }
+        else if (objName == "actionHighlightSelection")
+        { // 新增：高亮相关
+            highlightSelectionAction = action;
+        }
+        else if (objName == "actionClearHighlights")
+        { // 新增：高亮相关
+            clearHighlightsAction = action;
+        }
     }
 
     // 调试输出动作查找结果
@@ -284,6 +341,7 @@ void Editor::findActionsFromMainWindow()
     qDebug() << "actionReplace: " << (replaceAction ? "找到" : "未找到");
     qDebug() << "actionInsert: " << (insertAction ? "找到" : "未找到");
     qDebug() << "actionFont: " << (fontAction ? "找到" : "未找到"); // 新增：字体动作状态
+
 }
 
 // 建立动作与编辑器功能的连接
@@ -356,11 +414,35 @@ void Editor::setupConnections()
         connect(fontAction, &QAction::triggered, this, &Editor::handleFontSettings);
     }
 
+    //新增：高亮
+    // 绑定“高亮所选”
+    if (highlightSelectionAction) {
+        disconnect(highlightSelectionAction, 0, 0, 0);
+        connect(highlightSelectionAction, &QAction::triggered, this, &Editor::highlightSelection);
+    }
+
+    // 绑定“清除高亮”
+    if (clearHighlightsAction) {
+        disconnect(clearHighlightsAction, 0, 0, 0);
+        connect(clearHighlightsAction, &QAction::triggered, this, &Editor::clearAllHighlights);
+    }
+
     connect(this, &QPlainTextEdit::textChanged, this, &Editor::updateActionStates);
     QAction *commentAction = new QAction(this);
     commentAction->setShortcut(QKeySequence("Ctrl+/"));
     connect(commentAction, &QAction::triggered, this, &Editor::handleComment);
     addAction(commentAction);
+
+    QAction *findNextAction = new QAction(this);
+    findNextAction->setShortcut(QKeySequence::FindNext);
+    connect(findNextAction, &QAction::triggered, this, &Editor::findNext);
+    addAction(findNextAction);
+
+    QAction *findPrevAction = new QAction(this);
+    findPrevAction->setShortcut(QKeySequence::FindPrevious);
+    connect(findPrevAction, &QAction::triggered, this, &Editor::findPrevious);
+    addAction(findPrevAction);
+
 }
 
 // 更新编辑动作的启用状态
@@ -433,40 +515,20 @@ void Editor::handlePaste()
 // 处理查找功能
 void Editor::handleFind()
 {
-    // 显示查找对话框获取搜索文本
     bool ok;
     QString searchText = QInputDialog::getText(this, tr("查找"),
                                                tr("输入要查找的内容:"), QLineEdit::Normal,
-                                               "", &ok);
-    if (!ok || searchText.isEmpty())
-        return;
+                                               m_searchText, &ok);
+    if (!ok || searchText.isEmpty()) return;
 
-    // 设置查找选项（如大小写敏感）
-    QTextDocument::FindFlags flags;
-    // flags |= QTextDocument::FindCaseSensitively; // 取消注释启用大小写敏感
+    m_searchText = searchText;
+    m_searchFlags = QTextDocument::FindFlags();
+    // 如果需要大小写敏感： m_searchFlags |= QTextDocument::FindCaseSensitively;
 
-    // 从当前光标位置开始查找
-    QTextCursor cursor = textCursor();
-    cursor = document()->find(searchText, cursor, flags);
+    highlightAllMatches();
 
-    // 处理查找结果
-    if (!cursor.isNull())
-    {
-        setTextCursor(cursor); // 选中找到的文本
-    }
-    else
-    {
-        // 未找到则从文档开头重新查找
-        cursor = document()->find(searchText, QTextCursor(document()));
-        if (!cursor.isNull())
-        {
-            setTextCursor(cursor);
-        }
-        else
-        {
-            qDebug() << "未找到匹配的文本: " << searchText;
-        }
-    }
+    if (m_currentMatchIndex >= 0 && m_currentMatchIndex < m_matchCursors.size())
+        setTextCursor(m_matchCursors[m_currentMatchIndex]);
 }
 
 // 处理替换功能
@@ -507,35 +569,36 @@ void Editor::handleReplace()
     highlightNewLines(); // 新增：替换后更新新增行标记
 }
 
-// 替换当前选中的匹配项
+
 void Editor::replaceCurrent(const QString &searchText, const QString &replaceText)
 {
-    QTextCursor cursor = document()->find(searchText, textCursor());
-    if (!cursor.isNull())
-    {
-        cursor.insertText(replaceText); // 执行替换
-        setTextCursor(cursor);          // 更新光标位置
-    }
-    else
-    {
-        qDebug() << "未找到匹配的文本: " << searchText;
+    if (m_currentMatchIndex >= 0 && m_currentMatchIndex < m_matchCursors.size()) {
+        QTextCursor c = m_matchCursors[m_currentMatchIndex];
+        c.beginEditBlock();
+        c.insertText(replaceText);
+        c.endEditBlock();
+        highlightAllMatches();
+    } else {
+        QTextCursor cursor = document()->find(searchText, textCursor());
+        if (!cursor.isNull()) { cursor.insertText(replaceText); highlightAllMatches(); }
+        else qDebug() << "未找到匹配的文本: " << searchText;
     }
 }
 
-// 替换所有匹配项
 void Editor::replaceAll(const QString &searchText, const QString &replaceText)
 {
     QTextCursor cursor(document());
     int count = 0;
-
-    // 遍历文档替换所有匹配项
-    while (!(cursor = document()->find(searchText, cursor)).isNull())
-    {
+    cursor.beginEditBlock();
+    while (!(cursor = document()->find(searchText, cursor)).isNull()) {
         cursor.insertText(replaceText);
-        ++count; // 计数替换次数
+        ++count;
     }
+    cursor.endEditBlock();
     qDebug() << "共替换" << count << "处匹配文本";
+    highlightAllMatches();
 }
+
 
 // 处理文本插入功能
 void Editor::handleInsert()
@@ -553,6 +616,41 @@ void Editor::handleInsert()
     cursor.insertText(insertText);
     setTextCursor(cursor); // 更新光标位置
 }
+
+// 高亮当前选中内容的所有匹配项（QAction 触发）
+void Editor::highlightSelection()
+{
+    QTextCursor sel = textCursor();
+    if (!sel.hasSelection()) {
+        // 如果没有选中，直接不做任何事或提示（这里静默返回）
+        return;
+    }
+
+    QString selectedText = sel.selectedText();
+    if (selectedText.isEmpty()) return;
+
+    // 保存搜索词并使用与查找相同的高亮机制
+    m_searchText = selectedText;
+    m_searchFlags = QTextDocument::FindFlags();
+    // 需要匹配整个单词可加入额外逻辑；目前为简单文本匹配
+
+    highlightAllMatches();
+
+    // 跳到第一个匹配（若存在）
+    if (m_currentMatchIndex >= 0 && m_currentMatchIndex < m_matchCursors.size()) {
+        setTextCursor(m_matchCursors[m_currentMatchIndex]);
+        // 确保可见（我们已有 highlightCurrentLine 内的滚动逻辑）
+        highlightCurrentLine();
+    }
+}
+
+// 清除全局查找高亮（QAction 触发）
+void Editor::clearAllHighlights()
+{
+    // 直接调用已有函数或做相同动作
+    clearFindHighlights(); // 我们之前实现过这个函数，会清空 m_searchText / m_matchCursors
+}
+
 
 // 新增：处理字体设置功能
 void Editor::handleFontSettings()
@@ -680,3 +778,115 @@ void Editor::handleComment()
 
     highlightNewLines(); // 更新新增行标记
 }
+
+void Editor::highlightAllMatches()
+{
+    m_matchCursors.clear();
+    if (m_searchText.isEmpty()) { m_currentMatchIndex = -1; highlightCurrentLine(); return; }
+
+    QTextCursor cursor(document());
+    while (true) {
+        cursor = document()->find(m_searchText, cursor, m_searchFlags);
+        if (cursor.isNull()) break;
+        m_matchCursors.push_back(cursor);
+        // 防止空匹配造成循环
+        cursor.setPosition(cursor.position());
+    }
+
+    if (!m_matchCursors.isEmpty()) m_currentMatchIndex = 0;
+    else m_currentMatchIndex = -1;
+
+    highlightCurrentLine();
+}
+
+void Editor::findNext()
+{
+    if (m_searchText.isEmpty()) return;
+    if (m_matchCursors.isEmpty()) {
+        QTextCursor c = document()->find(m_searchText, textCursor(), m_searchFlags);
+        if (!c.isNull()) setTextCursor(c);
+        return;
+    }
+    m_currentMatchIndex = (m_currentMatchIndex + 1) % m_matchCursors.size();
+    QTextCursor target = m_matchCursors[m_currentMatchIndex];
+    if (!target.isNull()) { setTextCursor(target); highlightCurrentLine(); }
+}
+
+void Editor::findPrevious()
+{
+    if (m_searchText.isEmpty()) return;
+    if (m_matchCursors.isEmpty()) {
+        QTextCursor c = document()->find(m_searchText, textCursor(), m_searchFlags | QTextDocument::FindBackward);
+        if (!c.isNull()) setTextCursor(c);
+        return;
+    }
+    m_currentMatchIndex = (m_currentMatchIndex - 1 + m_matchCursors.size()) % m_matchCursors.size();
+    QTextCursor target = m_matchCursors[m_currentMatchIndex];
+    if (!target.isNull()) { setTextCursor(target); highlightCurrentLine(); }
+}
+
+void Editor::clearFindHighlights()
+{
+    m_searchText.clear();
+    m_matchCursors.clear();
+    m_currentMatchIndex = -1;
+    highlightCurrentLine();
+}
+
+void Editor::clearHighlights()
+{
+    // 清空查找相关的状态
+    m_matchCursors.clear();
+    m_searchText.clear();
+    m_currentMatchIndex = -1;
+    highlightAllMatches();  // 刷新查找高亮
+
+    // 清空手动添加的高亮
+    m_selectionExtraSelections.clear();
+    setExtraSelections(baseExtraSelections());
+}
+
+
+void Editor::setHighlightActions(QAction *highlightAction, QAction *clearHighlightsAction)
+{
+    this->highlightSelectionAction = highlightAction;
+    this->clearHighlightsAction = clearHighlightsAction;
+
+    if (highlightSelectionAction) {
+        connect(highlightSelectionAction, &QAction::triggered, this, &Editor::highlightSelection);
+    }
+    if (clearHighlightsAction) {
+        connect(clearHighlightsAction, &QAction::triggered, this, &Editor::clearHighlights);
+    }
+}
+
+QList<QTextEdit::ExtraSelection> Editor::baseExtraSelections() const
+{
+    QList<QTextEdit::ExtraSelection> extraSelections;
+
+    // 当前行高亮
+    if (!isReadOnly()) {
+        QTextEdit::ExtraSelection selection;
+        selection.format.setBackground(QColor(Qt::yellow).lighter(190));
+        selection.format.setProperty(QTextFormat::FullWidthSelection, true);
+        selection.cursor = textCursor();
+        selection.cursor.clearSelection();
+        extraSelections.append(selection);
+    }
+
+    // 查找结果高亮
+    QTextCharFormat matchFormat;
+    matchFormat.setBackground(Qt::yellow);
+    for (const QTextCursor &cursor : m_matchCursors) {
+        QTextEdit::ExtraSelection matchSelection;
+        matchSelection.format = matchFormat;
+        matchSelection.cursor = cursor;
+        extraSelections.append(matchSelection);
+    }
+
+    // 叠加手动选中高亮
+    extraSelections.append(m_selectionExtraSelections);
+
+    return extraSelections;
+}
+
