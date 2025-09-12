@@ -30,6 +30,15 @@ Editor::Editor(QWidget *parent) : QPlainTextEdit(parent),
     // 初始化原始文本
     m_originalText = toPlainText();
 
+    // 初始化成对符号映射（新增）
+    m_matchingPairs.insert('(', ')');
+    m_matchingPairs.insert('{', '}');
+    m_matchingPairs.insert('[', ']');
+    m_matchingPairs.insert('<', '>');
+    m_matchingPairs.insert('\'', '\'');
+    m_matchingPairs.insert('"', '"');
+
+
     // 连接信号槽用于行号显示和当前行高亮
     connect(this, &Editor::blockCountChanged, this, &Editor::updateLineNumberAreaWidth);
     connect(this, &Editor::updateRequest, this, &Editor::updateLineNumberArea);
@@ -42,6 +51,78 @@ Editor::Editor(QWidget *parent) : QPlainTextEdit(parent),
     highlightCurrentLine();
     // 初始检查新增行
     highlightNewLines();
+}
+// 新增：处理文本输入，实现自动补全成对符号
+void Editor::keyPressEvent(QKeyEvent *event)
+{
+    // 1. 处理特殊按键（如退格键）
+    if (event->key() == Qt::Key_Backspace) {
+        // 获取当前光标
+        QTextCursor cursor = textCursor();
+
+        // 检查是否需要删除成对符号
+        if (cursor.hasSelection()) {
+            // 有选定时，直接调用父类处理
+            QPlainTextEdit::keyPressEvent(event);
+            return;
+        }
+
+        // 保存当前位置
+        int pos = cursor.position();
+        // 移动到前一个字符
+        cursor.movePosition(QTextCursor::Left, QTextCursor::KeepAnchor);
+        QString leftChar = cursor.selectedText();
+
+        // 移动到后一个字符
+        cursor.setPosition(pos);
+        cursor.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor);
+        QString rightChar = cursor.selectedText();
+
+        // 如果是成对符号，同时删除两个
+        if (m_matchingPairs.contains(leftChar[0]) &&
+            m_matchingPairs[leftChar[0]] == rightChar[0]) {
+            // 先删除左边字符
+            cursor.setPosition(pos - 1);
+            cursor.deleteChar();
+            // 再删除右边字符
+            cursor.deleteChar();
+            event->accept();
+            return;
+        }
+    }
+
+    // 2. 处理普通字符输入（成对符号补充）
+    QString inputText = event->text();
+    if (!inputText.isEmpty()) {  // 确保有输入字符
+        QChar inputChar = inputText.at(0);
+
+        // 检查是否是需要自动补全的左符号
+        if (m_matchingPairs.contains(inputChar)) {
+            // 获取匹配的右符号
+            QChar matchingChar = m_matchingPairs[inputChar];
+
+            // 保存当前光标位置
+            QTextCursor cursor = textCursor();
+            int originalPos = cursor.position();
+
+            // 插入左符号
+            cursor.insertText(inputChar);
+
+            // 插入右符号
+            cursor.insertText(matchingChar);
+
+            // 将光标移回两个符号之间
+            cursor.setPosition(originalPos + 1);
+            setTextCursor(cursor);
+
+            // 标记事件已处理
+            event->accept();
+            return;
+        }
+    }
+
+    // 3. 其他情况：调用父类方法处理
+    QPlainTextEdit::keyPressEvent(event);
 }
 // 获取行号区域宽度
 int Editor::lineNumberAreaWidth()
@@ -80,7 +161,7 @@ void Editor::lineNumberAreaPaintEvent(QPaintEvent *event)
             // 如果是新增行，用不同颜色显示行号
             if (m_newLineNumbers.contains(blockNumber + 1))
             {
-                painter.setPen(Qt::blue);
+                painter.setPen(Qt::red);
             }
 
             painter.drawText(0, top, lineNumberArea->width() - 3, fontMetrics().height(),
@@ -109,19 +190,44 @@ void Editor::highlightNewLines()
     QStringList originalLines = m_originalText.split('\n');
     QStringList currentLines = currentText.split('\n');
 
-    // 找出新增的行
-    int maxLines = qMax(originalLines.size(), currentLines.size());
-    for (int i = 0; i < maxLines; ++i)
-    {
-        if (i >= originalLines.size())
-        {
-            // 新增的行
-            m_newLineNumbers.insert(i + 1);
+    // 使用最长公共子序列(LCS)算法来确定哪些行是新增的
+    // 创建二维数组存储LCS长度
+    int m = originalLines.size();
+    int n = currentLines.size();
+    QVector<QVector<int>> lcs(m + 1, QVector<int>(n + 1, 0));
+
+    // 计算LCS
+    for (int i = 1; i <= m; ++i) {
+        for (int j = 1; j <= n; ++j) {
+            if (originalLines[i-1] == currentLines[j-1]) {
+                lcs[i][j] = lcs[i-1][j-1] + 1;
+            } else {
+                lcs[i][j] = qMax(lcs[i-1][j], lcs[i][j-1]);
+            }
         }
-        else if (i < currentLines.size() && currentLines[i] != originalLines[i])
-        {
-            // 修改过的行
-            m_newLineNumbers.insert(i + 1);
+    }
+
+    // 回溯找到匹配的行
+    QSet<int> matchedOriginalLines;
+    QSet<int> matchedCurrentLines;
+    int i = m, j = n;
+    while (i > 0 && j > 0) {
+        if (originalLines[i-1] == currentLines[j-1]) {
+            matchedOriginalLines.insert(i-1);
+            matchedCurrentLines.insert(j-1);
+            i--;
+            j--;
+        } else if (lcs[i-1][j] > lcs[i][j-1]) {
+            i--;
+        } else {
+            j--;
+        }
+    }
+
+    // 标记未匹配的当前行（新增行）
+    for (int k = 0; k < currentLines.size(); ++k) {
+        if (!matchedCurrentLines.contains(k)) {
+            m_newLineNumbers.insert(k + 1); // 行号从1开始
         }
     }
 
@@ -174,24 +280,6 @@ void Editor::highlightCurrentLine()
         selection.cursor.clearSelection();
         extraSelections.append(selection);
 
-        // 新增行高亮
-        QTextCursor cursor = textCursor();
-        QTextBlock block = document()->firstBlock();
-        while (block.isValid())
-        {
-            int lineNum = block.blockNumber() + 1;
-            if (m_newLineNumbers.contains(lineNum))
-            {
-                QTextEdit::ExtraSelection newLineSelection;
-                QColor newLineColor = QColor(Qt::green).lighter(180);
-                newLineSelection.format.setBackground(newLineColor);
-                newLineSelection.format.setProperty(QTextFormat::FullWidthSelection, true);
-                newLineSelection.cursor = QTextCursor(block);
-                newLineSelection.cursor.clearSelection();
-                extraSelections.append(newLineSelection);
-            }
-            block = block.next();
-        }
     }
 
     // --- 查找匹配高亮（新增） ---
