@@ -402,6 +402,7 @@ bool MainWindow::on_actionSave_triggered()
     QTextStream out(&file);
     out << m_editor->getCodeText();
     file.close();
+    m_editor->setOriginalText(m_editor->getCodeText());
 
     // 更新保存状态
     m_isSaved = true;
@@ -432,6 +433,10 @@ bool MainWindow::on_actionSaveAs_triggered()
     // 更新路径并保存
     m_currentFilePath = filePath;
     bool result = on_actionSave_triggered();
+    // 保存成功后，更新原始文本基准
+    if (result) {
+        m_editor->setOriginalText(m_editor->getCodeText());
+    }
 
     return result;
 }

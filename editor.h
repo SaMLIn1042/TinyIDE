@@ -54,6 +54,7 @@ public:
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
+    void keyPressEvent(QKeyEvent *event) override;
 
 private slots:
     void handleUndo();
@@ -112,6 +113,7 @@ private:
 
     void highlightSelection();//高亮相关
     void clearAllHighlights();//高亮相关
+    QHash<QChar, QChar> m_matchingPairs;    // 新增：存储成对符号
 };
 
 #endif // EDITOR_H
