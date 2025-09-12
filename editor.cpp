@@ -398,11 +398,27 @@ QFont Editor::getEditorFont() const
 // 从主窗口查找并关联编辑动作
 void Editor::findActionsFromMainWindow()
 {
-    // 获取父窗口中的动作对象
-    QMainWindow *mainWindow = qobject_cast<QMainWindow *>(window());
+    // 尝试获取主窗口
+    QMainWindow *mainWindow = nullptr;
+    QWidget *currentParent = parentWidget();
+
+    // 向上查找主窗口
+    while (currentParent && !mainWindow) {
+        mainWindow = qobject_cast<QMainWindow *>(currentParent);
+        currentParent = currentParent->parentWidget();  // 这里使用parentWidget()函数
+    }
+
+    // 如果没找到主窗口，尝试使用应用程序的主窗口
+    if (!mainWindow) {
+        foreach (QWidget *widget, QApplication::topLevelWidgets()) {
+            mainWindow = qobject_cast<QMainWindow *>(widget);
+            if (mainWindow) break;
+        }
+    }
+
     if (!mainWindow)
     {
-        qDebug() << "错误：未找到主窗口";
+        qDebug() << "警告：未找到主窗口，编辑器动作可能无法正常工作";
         return;
     }
 
@@ -485,6 +501,9 @@ void Editor::findActionsFromMainWindow()
     qDebug() << "替换动作: " << (replaceAction ? "找到" : "未找到");
     qDebug() << "插入动作: " << (insertAction ? "找到" : "未找到");
     qDebug() << "字体动作: " << (fontAction ? "找到" : "未找到");
+
+    // 设置连接
+    setupConnections();
 }
 
 // 建立动作与编辑器功能的信号槽连接

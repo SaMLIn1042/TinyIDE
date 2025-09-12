@@ -15,10 +15,13 @@
   </property>
   <widget class="QWidget" name="centralwidget">
    <widget class="QSplitter" name="splitter">
+    <property name="enabled">
+     <bool>true</bool>
+    </property>
     <property name="geometry">
      <rect>
-      <x>230</x>
-      <y>30</y>
+      <x>280</x>
+      <y>50</y>
       <width>256</width>
       <height>384</height>
      </rect>
@@ -26,24 +29,52 @@
     <property name="orientation">
      <enum>Qt::Vertical</enum>
     </property>
-    <widget class="Editor" name="editor">
-     <property name="enabled">
-      <bool>true</bool>
-     </property>
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-       <horstretch>0</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
-     </property>
-     <property name="maximumSize">
-      <size>
-       <width>16777214</width>
-       <height>16777215</height>
-      </size>
-     </property>
-    </widget>
     <widget class="QPlainTextEdit" name="outputTextEdit"/>
+   </widget>
+   <widget class="QTabWidget" name="tabWidget">
+    <property name="geometry">
+     <rect>
+      <x>620</x>
+      <y>310</y>
+      <width>127</width>
+      <height>80</height>
+     </rect>
+    </property>
+    <widget class="QWidget" name="tab_5">
+     <attribute name="title">
+      <string>Tab 1</string>
+     </attribute>
+     <widget class="Editor" name="editor">
+      <property name="enabled">
+       <bool>true</bool>
+      </property>
+      <property name="geometry">
+       <rect>
+        <x>-30</x>
+        <y>-90</y>
+        <width>256</width>
+        <height>190</height>
+       </rect>
+      </property>
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>16777214</width>
+        <height>16777215</height>
+       </size>
+      </property>
+     </widget>
+    </widget>
+    <widget class="QWidget" name="tab_6">
+     <attribute name="title">
+      <string>Tab 2</string>
+     </attribute>
+    </widget>
    </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
@@ -52,7 +83,7 @@
      <x>0</x>
      <y>0</y>
      <width>919</width>
-     <height>23</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
