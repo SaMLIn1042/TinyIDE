@@ -78,7 +78,7 @@ private slots:
     void onTextChanged();
     void setTabReplace(bool replace, int spaces = 4); // 仅保留一次声明
     void handleComment();
-
+    void highlightMatchingBracket(); //高亮匹配括号
 private:
     QAction *undoAction;
     QAction *cutAction;
@@ -115,6 +115,13 @@ private:
     void highlightSelection();//高亮相关
     void clearAllHighlights();//高亮相关
     QHash<QChar, QChar> m_matchingPairs;    // 新增：存储成对符号
+    // 原来的声明可能是3个参数，需要改为4个参数
+    int findMatchingBracket(int startPos, QChar bracket, QChar matchBracket, int direction);
+    // 在private部分添加
+    void highlightBracketPair(int pos1, int pos2);  // 新增这一行
+    void updateBracketHighlight();                  // 同时确保这个也已声明
+    void clearBracketHighlight();          // 清除括号高亮
+    QList<QTextEdit::ExtraSelection> m_bracketSelections;
 };
 
 #endif // EDITOR_H
