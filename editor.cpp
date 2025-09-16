@@ -84,6 +84,7 @@ Editor::Editor(QWidget *parent) : QPlainTextEdit(parent),
     connect(this, &Editor::updateRequest, this, &Editor::updateLineNumberArea);
     connect(this, &Editor::cursorPositionChanged, this, &Editor::highlightCurrentLine);
     connect(this, &Editor::textChanged, this, &Editor::onTextChanged);
+    connect(this, &Editor::cursorPositionChanged, this, &Editor::highlightMatchingBracket);
 
     // 初始更新行号区域宽度
     updateLineNumberAreaWidth(0);
@@ -91,6 +92,8 @@ Editor::Editor(QWidget *parent) : QPlainTextEdit(parent),
     highlightCurrentLine();
     // 初始检查新增行
     highlightNewLines();
+    // 初始化语法高亮器（添加在这里）
+    highlighter = new EditorSyntaxHighlighter(document());
 }
 
 // 加载Qt中文翻译文件
@@ -125,48 +128,66 @@ void Editor::keyPressEvent(QKeyEvent *event)
             return;
         }
 
-        // 检查是否为成对符号并同时删除
+        // 检查是否为成对符号并同时删除（增强小括号检测）
         int pos = cursor.position();
-        cursor.movePosition(QTextCursor::Left, QTextCursor::KeepAnchor);
-        QString leftChar = cursor.selectedText();
-
-        cursor.setPosition(pos);
-        cursor.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor);
-        QString rightChar = cursor.selectedText();
-
-        // 如果是成对符号，同时删除两个
-        if (m_matchingPairs.contains(leftChar[0]) &&
-            m_matchingPairs[leftChar[0]] == rightChar[0])
-        {
+        if (pos > 0) {
             cursor.setPosition(pos - 1);
-            cursor.deleteChar(); // 删除左侧字符
-            cursor.deleteChar(); // 删除右侧字符
-            event->accept();
-            return;
+            cursor.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor);
+            QString leftChar = cursor.selectedText();
+
+            if (!leftChar.isEmpty() && m_matchingPairs.contains(leftChar[0])) {
+                QChar rightChar = m_matchingPairs[leftChar[0]];
+
+                // 检查右侧是否有匹配的括号
+                if (pos < document()->characterCount()) {
+                    cursor.setPosition(pos);
+                    cursor.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor);
+                    QString actualRightChar = cursor.selectedText();
+
+                    if (actualRightChar[0] == rightChar) {
+                        // 同时删除左右括号
+                        cursor.setPosition(pos - 1);
+                        cursor.deleteChar();
+                        cursor.deleteChar();
+                        event->accept();
+                        return;
+                    }
+                }
+            }
         }
     }
 
-    // 处理普通字符输入（自动补全成对符号）
+    // 处理普通字符输入（确保小括号自动补全）
     QString inputText = event->text();
     if (!inputText.isEmpty())
     {
         QChar inputChar = inputText.at(0);
 
-        // 检查是否是需要自动补全的左符号
-        if (m_matchingPairs.contains(inputChar))
+        // 检查是否是需要自动补全的左符号（包含小括号）
+        if (m_matchingPairs.contains(inputChar) &&
+            // 排除单引号和双引号在选中内容时的自动补全
+            !( (inputChar == '\'' || inputChar == '"') && textCursor().hasSelection() ))
         {
             QChar matchingChar = m_matchingPairs[inputChar]; // 获取匹配的右符号
 
             // 插入左符号和右符号
             QTextCursor cursor = textCursor();
             int originalPos = cursor.position();
-            cursor.insertText(inputChar);
-            cursor.insertText(matchingChar);
 
-            // 将光标移回两个符号之间
-            cursor.setPosition(originalPos + 1);
+            // 如果是引号且已有选中内容，包裹选中内容
+            if ((inputChar == '\'' || inputChar == '"') && cursor.hasSelection()) {
+                QString selectedText = cursor.selectedText();
+                cursor.removeSelectedText();
+                cursor.insertText(inputChar + selectedText + matchingChar);
+                cursor.setPosition(originalPos + selectedText.length() + 2);
+            } else {
+                // 普通符号补全（包括小括号）
+                cursor.insertText(inputChar);
+                cursor.insertText(matchingChar);
+                cursor.setPosition(originalPos + 1);
+            }
+
             setTextCursor(cursor);
-
             event->accept();
             return;
         }
@@ -175,6 +196,7 @@ void Editor::keyPressEvent(QKeyEvent *event)
     // 其他情况调用父类方法处理
     QPlainTextEdit::keyPressEvent(event);
 }
+
 
 // 计算行号区域宽度
 int Editor::lineNumberAreaWidth()
@@ -379,31 +401,14 @@ void Editor::highlightCurrentLine()
             curSel.format.setBackground(curColor);
             curSel.cursor = cur;
             extraSelections.append(curSel);
-
-            // 将当前匹配项滚动到视图中心
-            QRect r = cursorRect(cur);
-            QScrollBar *hbar = horizontalScrollBar();
-            QScrollBar *vbar = verticalScrollBar();
-
-            int centerX = r.center().x();
-            int centerY = r.center().y();
-
-            // 计算新的滚动位置
-            int newH = hbar->value() + centerX - viewport()->width() / 2;
-            int newV = vbar->value() + centerY - viewport()->height() / 2;
-
-            // 限制在有效范围内
-            newH = qBound(hbar->minimum(), newH, hbar->maximum());
-            newV = qBound(vbar->minimum(), newV, vbar->maximum());
-
-            hbar->setValue(newH);
-            vbar->setValue(newV);
         }
     }
 
+    // 添加括号高亮（新增部分）
+    extraSelections.append(m_bracketSelections);
+
     setExtraSelections(extraSelections);
 }
-
 // 设置原始文本（用于对比新增内容）
 void Editor::setOriginalText(const QString &text)
 {
@@ -1143,6 +1148,162 @@ QList<QTextEdit::ExtraSelection> Editor::baseExtraSelections() const
     return extraSelections;
 }
 
+// 高亮匹配括号
+void Editor::highlightMatchingBracket()
+{
+    // 清除之前的括号高亮
+
+    QTextCursor cursor = textCursor();
+    int position = cursor.position();
+    QTextDocument *doc = document();
+
+    // 获取当前字符和前一个字符
+    QChar currentChar, prevChar;
+    if (position > 0) {
+        prevChar = doc->characterAt(position - 1);
+    }
+    if (position < doc->characterCount()) {
+        currentChar = doc->characterAt(position);
+    }
+
+    // 检查是否是左括号或右括号
+    if (m_matchingPairs.contains(prevChar)) {
+        // 处理左括号
+        QChar matchChar = m_matchingPairs[prevChar];
+        int matchPos = findMatchingBracket(position - 1, prevChar, matchChar, 1);
+        if (matchPos != -1) {
+            highlightBracketPair(position - 1, matchPos);
+        }
+    } else if (m_matchingPairs.values().contains(currentChar)) {
+        // 处理右括号，找到对应的左括号
+        QChar matchChar;
+        for (auto it = m_matchingPairs.begin(); it != m_matchingPairs.end(); ++it) {
+            if (it.value() == currentChar) {
+                matchChar = it.key();
+                break;
+            }
+        }
+
+        int matchPos = findMatchingBracket(position, currentChar, matchChar, -1);
+        if (matchPos != -1) {
+            highlightBracketPair(matchPos, position);
+        }
+    }
+}
+
+// 查找匹配的括号
+// 3. 增强括号匹配查找逻辑
+int Editor::findMatchingBracket(int startPos, QChar bracket, QChar matchBracket, int direction)
+{
+    QTextDocument *doc = document();
+    int depth = 1;
+    int currentPos = startPos + direction;
+
+    // 特别处理小括号的查找逻辑
+    while (currentPos >= 0 && currentPos < doc->characterCount()) {
+        QChar c = doc->characterAt(currentPos);
+
+        // 忽略字符串中的括号
+        static QSet<QChar> quotes = {'"', '\''};
+        static bool inString = false;
+        static QChar currentQuote;
+
+        if (quotes.contains(c)) {
+            if (!inString) {
+                inString = true;
+                currentQuote = c;
+            } else if (c == currentQuote) {
+                inString = false;
+            }
+            currentPos += direction;
+            continue;
+        }
+
+        // 如果在字符串中，跳过所有字符
+        if (inString) {
+            currentPos += direction;
+            continue;
+        }
+
+        // 括号匹配逻辑
+        if (c == bracket) {
+            depth++;  // 遇到相同括号，深度增加
+        } else if (c == matchBracket) {
+            depth--;  // 遇到匹配括号，深度减少
+            if (depth == 0) {
+                return currentPos;  // 找到匹配的括号
+            }
+        }
+
+        currentPos += direction;
+    }
+
+    return -1;  // 未找到匹配的括号
+}
+
+// 高亮显示括号对
+void Editor::highlightBracketPair(int pos1, int pos2)
+{
+    // 创建高亮格式
+    QTextCharFormat format;
+    format.setBackground(QColor(255, 255, 153));  // 浅黄色背景
+    format.setForeground(QColor(255, 0, 0));     // 红色文字
+    format.setFontWeight(QFont::Bold);
+
+    // 第一个括号
+    QTextEdit::ExtraSelection selection1;
+    selection1.format = format;
+    selection1.cursor = textCursor();
+    selection1.cursor.setPosition(pos1);
+    selection1.cursor.movePosition(QTextCursor::NextCharacter, QTextCursor::KeepAnchor);
+
+    // 第二个括号
+    QTextEdit::ExtraSelection selection2;
+    selection2.format = format;
+    selection2.cursor = textCursor();
+    selection2.cursor.setPosition(pos2);
+    selection2.cursor.movePosition(QTextCursor::NextCharacter, QTextCursor::KeepAnchor);
+
+    // 保存并应用高亮
+    m_bracketSelections.clear();
+    m_bracketSelections.append(selection1);
+    m_bracketSelections.append(selection2);
+
+    // 更新高亮显示
+    updateBracketHighlight();
+}
+
+// 清除括号高亮
+void Editor::clearBracketHighlight()
+{
+    if (!m_bracketSelections.isEmpty()) {
+        m_bracketSelections.clear();
+        updateBracketHighlight();
+    }
+}
+
+void Editor::updateBracketHighlight()
+{
+    // 获取现有的高亮选区
+    QList<QTextEdit::ExtraSelection> selections = extraSelections();
+
+    // 移除之前的括号高亮
+    for (int i = selections.size() - 1; i >= 0; --i) {
+        // 通过背景色识别括号高亮
+        if (selections[i].format.background().color() == QColor(255, 255, 153)) {
+            selections.removeAt(i);
+        }
+    }
+
+    // 添加新的括号高亮
+    selections.append(m_bracketSelections);
+
+    // 应用更新后的高亮
+    setExtraSelections(selections);
+}
+// 更新括号高亮显示
+
+
 void Editor::wheelEvent(QWheelEvent *event)
 {
     // 检查是否按住Ctrl键
@@ -1177,4 +1338,105 @@ void Editor::wheelEvent(QWheelEvent *event)
         QPlainTextEdit::wheelEvent(event);
     }
 }
+EditorSyntaxHighlighter::EditorSyntaxHighlighter(QTextDocument *parent)
+    : QSyntaxHighlighter(parent)
+{
+    // 关键字格式
+    keywordFormat.setForeground(Qt::darkBlue);
+    keywordFormat.setFontWeight(QFont::Bold);
 
+    // C++关键字
+    QStringList keywordPatterns = {
+        "\\bchar\\b", "\\bclass\\b", "\\bconst\\b",
+        "\\bdouble\\b", "\\benum\\b", "\\bexplicit\\b",
+        "\\bfriend\\b", "\\binline\\b", "\\bint\\b",
+        "\\blong\\b", "\\bnamespace\\b", "\\boperator\\b",
+        "\\bprivate\\b", "\\bprotected\\b", "\\bpublic\\b",
+        "\\bshort\\b", "\\bsignals\\b", "\\bsigned\\b",
+        "\\bslots\\b", "\\bstatic\\b", "\\bstruct\\b",
+        "\\btemplate\\b", "\\btypedef\\b", "\\btypename\\b",
+        "\\bunion\\b", "\\bunsigned\\b", "\\bvirtual\\b",
+        "\\bvoid\\b", "\\bvolatile\\b", "\\bbool\\b",
+        "\\bif\\b", "\\belse\\b", "\\bswitch\\b", "\\bcase\\b",
+        "\\bdefault\\b", "\\bfor\\b", "\\bwhile\\b", "\\bdo\\b",
+        "\\breturn\\b", "\\bbreak\\b", "\\bcontinue\\b", "\\bdelete\\b",
+        "\\bnew\\b", "\\bthis\\b", "\\bsizeof\\b", "\\btrue\\b", "\\bfalse\\b"
+    };
+
+    // 添加关键字规则
+    for (const QString &pattern : keywordPatterns) {
+        highlightingRules.append({QRegularExpression(pattern), keywordFormat});
+    }
+
+    // 类名格式
+    classFormat.setForeground(Qt::darkMagenta);
+    classFormat.setFontWeight(QFont::Bold);
+    highlightingRules.append({QRegularExpression("\\bQ[A-Za-z]+\\b"), classFormat});
+
+    // 函数格式
+    functionFormat.setForeground(Qt::darkCyan);
+    highlightingRules.append({QRegularExpression("\\b[A-Za-z0-9_]+(?=\\()"), functionFormat});
+
+    // 引号字符串格式
+    quotationFormat.setForeground(Qt::darkGreen);
+    highlightingRules.append({QRegularExpression("\".*\""), quotationFormat});
+    highlightingRules.append({QRegularExpression("'.*'"), quotationFormat});
+
+    // 数字格式
+    numberFormat.setForeground(Qt::darkRed);
+    highlightingRules.append({QRegularExpression("\\b[0-9]+\\b"), numberFormat});
+    highlightingRules.append({QRegularExpression("\\b0x[0-9A-Fa-f]+\\b"), numberFormat});
+    highlightingRules.append({QRegularExpression("\\b[0-9]+\\.[0-9]+\\b"), numberFormat});
+
+    // 单行注释格式
+    singleLineCommentFormat.setForeground(Qt::gray);
+    highlightingRules.append({QRegularExpression("//[^\n]*"), singleLineCommentFormat});
+
+    // 多行注释格式
+    multiLineCommentFormat.setForeground(Qt::gray);
+    commentStartExpression = QRegularExpression("/\\*");
+    commentEndExpression = QRegularExpression("\\*/");
+}
+
+void EditorSyntaxHighlighter::highlightBlock(const QString &text)
+{
+    // 应用所有单行文法规则
+    for (const HighlightingRule &rule : qAsConst(highlightingRules)) {
+        QRegularExpressionMatchIterator matchIterator = rule.pattern.globalMatch(text);
+        while (matchIterator.hasNext()) {
+            QRegularExpressionMatch match = matchIterator.next();
+            setFormat(match.capturedStart(), match.capturedLength(), rule.format);
+        }
+    }
+
+    // 处理多行注释
+    setCurrentBlockState(0);
+
+    int startIndex = 0;
+    if (previousBlockState() != 1)
+        startIndex = text.indexOf(commentStartExpression);
+
+    while (startIndex >= 0) {
+        QRegularExpressionMatch match = commentEndExpression.match(text, startIndex);
+        int endIndex = match.capturedStart();
+        int commentLength = 0;
+
+        if (endIndex == -1) {
+            setCurrentBlockState(1);
+            commentLength = text.length() - startIndex;
+        } else {
+            commentLength = endIndex - startIndex + match.capturedLength();
+        }
+
+        setFormat(startIndex, commentLength, multiLineCommentFormat);
+        startIndex = text.indexOf(commentStartExpression, startIndex + commentLength);
+    }
+}
+Editor::~Editor()
+{
+    if (highlighter) {
+        delete highlighter; // highlighter可能未被初始化或已由Qt管理
+        highlighter = nullptr;
+    }
+    // 注释掉的删除lineNumberArea和动作对象的代码
+}

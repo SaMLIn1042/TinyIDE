@@ -11,13 +11,47 @@
 #include <QSet>
 #include <QVector>
 #include <QTextCursor>
+#include <QSyntaxHighlighter>
+#include <QTextCharFormat>
+#include <QRegularExpression>
+
+// 直接在Editor头文件中定义语法高亮器类
+class EditorSyntaxHighlighter : public QSyntaxHighlighter
+{
+    Q_OBJECT
+
+public:
+    explicit EditorSyntaxHighlighter(QTextDocument *parent = nullptr);
+
+protected:
+    void highlightBlock(const QString &text) override;
+
+private:
+    struct HighlightingRule
+    {
+        QRegularExpression pattern;
+        QTextCharFormat format;
+    };
+    QVector<HighlightingRule> highlightingRules;
+
+    QRegularExpression commentStartExpression;
+    QRegularExpression commentEndExpression;
+
+    QTextCharFormat keywordFormat;
+    QTextCharFormat classFormat;
+    QTextCharFormat singleLineCommentFormat;
+    QTextCharFormat multiLineCommentFormat;
+    QTextCharFormat quotationFormat;
+    QTextCharFormat functionFormat;
+    QTextCharFormat numberFormat;
+};
 
 class Editor : public QPlainTextEdit {
     Q_OBJECT
 
 public:
     explicit Editor(QWidget *parent = nullptr);
-    ~Editor() override = default;
+    ~Editor() override;
 
     QString getCodeText() const;
     void setEditorFont(const QFont &font); // 设置编辑器字体
@@ -45,7 +79,6 @@ public:
         {
             codeEditor->lineNumberAreaPaintEvent(event);
         }
-
 
     private:
         Editor *codeEditor;
@@ -80,7 +113,7 @@ private slots:
     void onTextChanged();
     void setTabReplace(bool replace, int spaces = 4); // 仅保留一次声明
     void handleComment();
-
+    void highlightMatchingBracket(); //高亮匹配括号
 private:
     QAction *undoAction;
     QAction *cutAction;
@@ -103,6 +136,8 @@ private:
     QVector<QTextCursor> m_matchCursors;
     int m_currentMatchIndex = -1;
 
+    // 语法高亮器实例
+    EditorSyntaxHighlighter *highlighter;
 
     void setupConnections();
     void updateActionStates();
@@ -117,6 +152,13 @@ private:
     void highlightSelection();//高亮相关
     void clearAllHighlights();//高亮相关
     QHash<QChar, QChar> m_matchingPairs;    // 新增：存储成对符号
+    // 原来的声明可能是3个参数，需要改为4个参数
+    int findMatchingBracket(int startPos, QChar bracket, QChar matchBracket, int direction);
+    // 在private部分添加
+    void highlightBracketPair(int pos1, int pos2);  // 新增这一行
+    void updateBracketHighlight();                  // 同时确保这个也已声明
+    void clearBracketHighlight();          // 清除括号高亮
+    QList<QTextEdit::ExtraSelection> m_bracketSelections;
 };
 
 #endif // EDITOR_H
