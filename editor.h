@@ -46,6 +46,7 @@ public:
             codeEditor->lineNumberAreaPaintEvent(event);
         }
 
+
     private:
         Editor *codeEditor;
     };
@@ -56,6 +57,7 @@ protected:
     void resizeEvent(QResizeEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void loadChineseTranslation();
+    void wheelEvent(QWheelEvent *event) override;
 
 private slots:
     void handleUndo();

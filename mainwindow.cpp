@@ -49,6 +49,9 @@ MainWindow::MainWindow(QWidget *parent)
     m_tabWidget->setTabsClosable(true); // 允许关闭标签
     m_tabWidget->setMovable(true);      // 允许拖动标签
 
+    // 获取默认字体
+    QFont defaultFont = getDefaultEditorFont();
+
     // 设置初始示例代码
     QString initialCode =
         "#include <stdio.h>\n\n"
@@ -62,6 +65,9 @@ MainWindow::MainWindow(QWidget *parent)
     Editor *editor = new Editor();
     editor->setPlainText(initialCode);
     editor->setOriginalText(initialCode);
+
+    // 确保应用默认字体
+    editor->setEditorFont(defaultFont);
 
     // 连接编辑器内容变化信号
     connect(editor, &QPlainTextEdit::textChanged,
@@ -174,6 +180,38 @@ MainWindow::MainWindow(QWidget *parent)
 MainWindow::~MainWindow()
 {
     delete ui;
+}
+
+QFont MainWindow::getDefaultEditorFont() const
+{
+    QFont defaultFont;
+
+    // 更可靠的字体检测方法
+    QStringList preferredFonts = {
+        "Consolas",
+        "Source Code Pro",
+        "Monaco",
+        "Courier New",
+        "Monospace"  // 通用等宽字体
+    };
+
+    // 检查系统是否有首选字体
+    QFontDatabase fontDb;
+    QString selectedFont = "Monospace"; // 默认回退
+
+    for (const QString &fontName : preferredFonts) {
+        if (fontDb.families().contains(fontName)) {
+            selectedFont = fontName;
+            qDebug() << "使用字体:" << fontName;
+            break;
+        }
+    }
+
+    defaultFont.setFamily(selectedFont);
+    defaultFont.setPointSize(10);
+    defaultFont.setStyleHint(QFont::TypeWriter); // 明确指定为等宽字体
+
+    return defaultFont;
 }
 
 // 标签页切换处理
@@ -316,6 +354,9 @@ void MainWindow::handleRunOutput(const QString &output)
 // 新建文件处理
 void MainWindow::on_actionNew_triggered()
 {
+    // 获取默认字体
+    QFont defaultFont = getDefaultEditorFont();
+
     // 创建新编辑器
     Editor *editor = new Editor();
 
@@ -328,6 +369,9 @@ void MainWindow::on_actionNew_triggered()
         "}";
     editor->setPlainText(initialCode);
     editor->setOriginalText(initialCode);
+
+    // 确保应用默认字体
+    editor->setEditorFont(defaultFont);
 
     // 连接编辑器内容变化信号 - 使用lambda确保正确绑定
     connect(editor, &QPlainTextEdit::textChanged, this, [this, editor]() {
@@ -390,8 +434,14 @@ void MainWindow::on_actionOpen_triggered()
         return;
     }
 
+    // 获取默认字体
+    QFont defaultFont = getDefaultEditorFont();
+
     // 创建新编辑器
     Editor *editor = new Editor();
+
+    // 确保新编辑器使用默认字体
+    editor->setEditorFont(defaultFont);
 
     // 显示文件内容
     QTextStream in(&file);

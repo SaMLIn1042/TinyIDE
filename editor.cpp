@@ -27,6 +27,42 @@ Editor::Editor(QWidget *parent) : QPlainTextEdit(parent),
     loadChineseTranslation();
 
     setUndoRedoEnabled(true);    // 启用撤销重做功能
+
+//    // 设置默认字体 - 使用更适合代码编辑的等宽字体
+//    QFont defaultFont;
+
+//    // 更可靠的字体检测方法
+//    QStringList preferredFonts = {
+//        "Consolas",
+//        "Source Code Pro",
+//        "Monaco",
+//        "Courier New",
+//        "Monospace"  // 通用等宽字体
+//    };
+
+//    // 检查系统是否有首选字体
+//    QFontDatabase fontDb;
+//    QString selectedFont = "Monospace"; // 默认回退
+
+//    for (const QString &fontName : preferredFonts) {
+//        if (fontDb.families().contains(fontName)) {
+//            selectedFont = fontName;
+//            qDebug() << "使用字体:" << fontName;
+//            break;
+//        }
+//    }
+
+//    defaultFont.setFamily(selectedFont);
+//    defaultFont.setPointSize(10);
+//    defaultFont.setStyleHint(QFont::TypeWriter); // 明确指定为等宽字体
+
+//    setFont(defaultFont);
+
+//    // 调试输出当前使用的字体信息
+//    qDebug() << "编辑器字体设置为:" << font().family()
+//             << "大小:" << font().pointSize()
+//             << "是否为等宽字体:" << QFontInfo(font()).fixedPitch();
+
     setTabReplace(true, 4);      // 设置Tab键替换为4个空格
     findActionsFromMainWindow(); // 从主窗口查找关联动作
     setupConnections();          // 建立信号槽连接
@@ -387,6 +423,9 @@ void Editor::setEditorFont(const QFont &font)
     setFont(font);
     // 更新Tab宽度以适应新字体
     setTabReplace(true, 4);
+
+    // 确保行号区域也更新
+    updateLineNumberAreaWidth(0);
 }
 
 // 获取当前编辑器字体
@@ -1103,3 +1142,39 @@ QList<QTextEdit::ExtraSelection> Editor::baseExtraSelections() const
 
     return extraSelections;
 }
+
+void Editor::wheelEvent(QWheelEvent *event)
+{
+    // 检查是否按住Ctrl键
+    if (event->modifiers() & Qt::ControlModifier) {
+        // 获取当前字体
+        QFont currentFont = font();
+        int fontSize = currentFont.pointSize();
+
+        // 根据滚轮方向调整字体大小
+        if (event->angleDelta().y() > 0) {
+            // 滚轮向上，增大字体
+            fontSize += 1;
+        } else {
+            // 滚轮向下，减小字体
+            fontSize -= 1;
+        }
+
+        // 限制字体大小范围（例如 6-72）
+        fontSize = qMax(6, qMin(72, fontSize));
+
+        // 设置新字体
+        currentFont.setPointSize(fontSize);
+        setFont(currentFont);
+
+        // 更新Tab宽度
+        setTabReplace(true, 4);
+
+        // 接受事件，阻止继续传递
+        event->accept();
+    } else {
+        // 非Ctrl键时执行默认滚轮行为（滚动文本）
+        QPlainTextEdit::wheelEvent(event);
+    }
+}
+
