@@ -80,6 +80,7 @@ public:
             codeEditor->lineNumberAreaPaintEvent(event);
         }
 
+
     private:
         Editor *codeEditor;
     };
