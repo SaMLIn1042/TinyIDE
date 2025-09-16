@@ -11,13 +11,47 @@
 #include <QSet>
 #include <QVector>
 #include <QTextCursor>
+#include <QSyntaxHighlighter>
+#include <QTextCharFormat>
+#include <QRegularExpression>
+
+// 直接在Editor头文件中定义语法高亮器类
+class EditorSyntaxHighlighter : public QSyntaxHighlighter
+{
+    Q_OBJECT
+
+public:
+    explicit EditorSyntaxHighlighter(QTextDocument *parent = nullptr);
+
+protected:
+    void highlightBlock(const QString &text) override;
+
+private:
+    struct HighlightingRule
+    {
+        QRegularExpression pattern;
+        QTextCharFormat format;
+    };
+    QVector<HighlightingRule> highlightingRules;
+
+    QRegularExpression commentStartExpression;
+    QRegularExpression commentEndExpression;
+
+    QTextCharFormat keywordFormat;
+    QTextCharFormat classFormat;
+    QTextCharFormat singleLineCommentFormat;
+    QTextCharFormat multiLineCommentFormat;
+    QTextCharFormat quotationFormat;
+    QTextCharFormat functionFormat;
+    QTextCharFormat numberFormat;
+};
 
 class Editor : public QPlainTextEdit {
     Q_OBJECT
 
 public:
     explicit Editor(QWidget *parent = nullptr);
-    ~Editor() override = default;
+    ~Editor() override;
 
     QString getCodeText() const;
     void setEditorFont(const QFont &font); // 设置编辑器字体
@@ -56,6 +90,7 @@ protected:
     void resizeEvent(QResizeEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void loadChineseTranslation();
+    void wheelEvent(QWheelEvent *event) override;
 
 private slots:
     void handleUndo();
@@ -101,6 +136,8 @@ private:
     QVector<QTextCursor> m_matchCursors;
     int m_currentMatchIndex = -1;
 
+    // 语法高亮器实例
+    EditorSyntaxHighlighter *highlighter;
 
     void setupConnections();
     void updateActionStates();

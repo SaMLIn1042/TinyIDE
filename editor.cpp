@@ -27,6 +27,42 @@ Editor::Editor(QWidget *parent) : QPlainTextEdit(parent),
     loadChineseTranslation();
 
     setUndoRedoEnabled(true);    // 启用撤销重做功能
+
+//    // 设置默认字体 - 使用更适合代码编辑的等宽字体
+//    QFont defaultFont;
+
+//    // 更可靠的字体检测方法
+//    QStringList preferredFonts = {
+//        "Consolas",
+//        "Source Code Pro",
+//        "Monaco",
+//        "Courier New",
+//        "Monospace"  // 通用等宽字体
+//    };
+
+//    // 检查系统是否有首选字体
+//    QFontDatabase fontDb;
+//    QString selectedFont = "Monospace"; // 默认回退
+
+//    for (const QString &fontName : preferredFonts) {
+//        if (fontDb.families().contains(fontName)) {
+//            selectedFont = fontName;
+//            qDebug() << "使用字体:" << fontName;
+//            break;
+//        }
+//    }
+
+//    defaultFont.setFamily(selectedFont);
+//    defaultFont.setPointSize(10);
+//    defaultFont.setStyleHint(QFont::TypeWriter); // 明确指定为等宽字体
+
+//    setFont(defaultFont);
+
+//    // 调试输出当前使用的字体信息
+//    qDebug() << "编辑器字体设置为:" << font().family()
+//             << "大小:" << font().pointSize()
+//             << "是否为等宽字体:" << QFontInfo(font()).fixedPitch();
+
     setTabReplace(true, 4);      // 设置Tab键替换为4个空格
     findActionsFromMainWindow(); // 从主窗口查找关联动作
     setupConnections();          // 建立信号槽连接
@@ -56,6 +92,8 @@ Editor::Editor(QWidget *parent) : QPlainTextEdit(parent),
     highlightCurrentLine();
     // 初始检查新增行
     highlightNewLines();
+    // 初始化语法高亮器（添加在这里）
+    highlighter = new EditorSyntaxHighlighter(document());
 }
 
 // 加载Qt中文翻译文件
@@ -390,6 +428,9 @@ void Editor::setEditorFont(const QFont &font)
     setFont(font);
     // 更新Tab宽度以适应新字体
     setTabReplace(true, 4);
+
+    // 确保行号区域也更新
+    updateLineNumberAreaWidth(0);
 }
 
 // 获取当前编辑器字体
@@ -1106,6 +1147,7 @@ QList<QTextEdit::ExtraSelection> Editor::baseExtraSelections() const
 
     return extraSelections;
 }
+
 // 高亮匹配括号
 void Editor::highlightMatchingBracket()
 {
@@ -1260,3 +1302,141 @@ void Editor::updateBracketHighlight()
     setExtraSelections(selections);
 }
 // 更新括号高亮显示
+
+
+void Editor::wheelEvent(QWheelEvent *event)
+{
+    // 检查是否按住Ctrl键
+    if (event->modifiers() & Qt::ControlModifier) {
+        // 获取当前字体
+        QFont currentFont = font();
+        int fontSize = currentFont.pointSize();
+
+        // 根据滚轮方向调整字体大小
+        if (event->angleDelta().y() > 0) {
+            // 滚轮向上，增大字体
+            fontSize += 1;
+        } else {
+            // 滚轮向下，减小字体
+            fontSize -= 1;
+        }
+
+        // 限制字体大小范围（例如 6-72）
+        fontSize = qMax(6, qMin(72, fontSize));
+
+        // 设置新字体
+        currentFont.setPointSize(fontSize);
+        setFont(currentFont);
+
+        // 更新Tab宽度
+        setTabReplace(true, 4);
+
+        // 接受事件，阻止继续传递
+        event->accept();
+    } else {
+        // 非Ctrl键时执行默认滚轮行为（滚动文本）
+        QPlainTextEdit::wheelEvent(event);
+    }
+}
+EditorSyntaxHighlighter::EditorSyntaxHighlighter(QTextDocument *parent)
+    : QSyntaxHighlighter(parent)
+{
+    // 关键字格式
+    keywordFormat.setForeground(Qt::darkBlue);
+    keywordFormat.setFontWeight(QFont::Bold);
+
+    // C++关键字
+    QStringList keywordPatterns = {
+        "\\bchar\\b", "\\bclass\\b", "\\bconst\\b",
+        "\\bdouble\\b", "\\benum\\b", "\\bexplicit\\b",
+        "\\bfriend\\b", "\\binline\\b", "\\bint\\b",
+        "\\blong\\b", "\\bnamespace\\b", "\\boperator\\b",
+        "\\bprivate\\b", "\\bprotected\\b", "\\bpublic\\b",
+        "\\bshort\\b", "\\bsignals\\b", "\\bsigned\\b",
+        "\\bslots\\b", "\\bstatic\\b", "\\bstruct\\b",
+        "\\btemplate\\b", "\\btypedef\\b", "\\btypename\\b",
+        "\\bunion\\b", "\\bunsigned\\b", "\\bvirtual\\b",
+        "\\bvoid\\b", "\\bvolatile\\b", "\\bbool\\b",
+        "\\bif\\b", "\\belse\\b", "\\bswitch\\b", "\\bcase\\b",
+        "\\bdefault\\b", "\\bfor\\b", "\\bwhile\\b", "\\bdo\\b",
+        "\\breturn\\b", "\\bbreak\\b", "\\bcontinue\\b", "\\bdelete\\b",
+        "\\bnew\\b", "\\bthis\\b", "\\bsizeof\\b", "\\btrue\\b", "\\bfalse\\b"
+    };
+
+    // 添加关键字规则
+    for (const QString &pattern : keywordPatterns) {
+        highlightingRules.append({QRegularExpression(pattern), keywordFormat});
+    }
+
+    // 类名格式
+    classFormat.setForeground(Qt::darkMagenta);
+    classFormat.setFontWeight(QFont::Bold);
+    highlightingRules.append({QRegularExpression("\\bQ[A-Za-z]+\\b"), classFormat});
+
+    // 函数格式
+    functionFormat.setForeground(Qt::darkCyan);
+    highlightingRules.append({QRegularExpression("\\b[A-Za-z0-9_]+(?=\\()"), functionFormat});
+
+    // 引号字符串格式
+    quotationFormat.setForeground(Qt::darkGreen);
+    highlightingRules.append({QRegularExpression("\".*\""), quotationFormat});
+    highlightingRules.append({QRegularExpression("'.*'"), quotationFormat});
+
+    // 数字格式
+    numberFormat.setForeground(Qt::darkRed);
+    highlightingRules.append({QRegularExpression("\\b[0-9]+\\b"), numberFormat});
+    highlightingRules.append({QRegularExpression("\\b0x[0-9A-Fa-f]+\\b"), numberFormat});
+    highlightingRules.append({QRegularExpression("\\b[0-9]+\\.[0-9]+\\b"), numberFormat});
+
+    // 单行注释格式
+    singleLineCommentFormat.setForeground(Qt::gray);
+    highlightingRules.append({QRegularExpression("//[^\n]*"), singleLineCommentFormat});
+
+    // 多行注释格式
+    multiLineCommentFormat.setForeground(Qt::gray);
+    commentStartExpression = QRegularExpression("/\\*");
+    commentEndExpression = QRegularExpression("\\*/");
+}
+
+void EditorSyntaxHighlighter::highlightBlock(const QString &text)
+{
+    // 应用所有单行文法规则
+    for (const HighlightingRule &rule : qAsConst(highlightingRules)) {
+        QRegularExpressionMatchIterator matchIterator = rule.pattern.globalMatch(text);
+        while (matchIterator.hasNext()) {
+            QRegularExpressionMatch match = matchIterator.next();
+            setFormat(match.capturedStart(), match.capturedLength(), rule.format);
+        }
+    }
+
+    // 处理多行注释
+    setCurrentBlockState(0);
+
+    int startIndex = 0;
+    if (previousBlockState() != 1)
+        startIndex = text.indexOf(commentStartExpression);
+
+    while (startIndex >= 0) {
+        QRegularExpressionMatch match = commentEndExpression.match(text, startIndex);
+        int endIndex = match.capturedStart();
+        int commentLength = 0;
+
+        if (endIndex == -1) {
+            setCurrentBlockState(1);
+            commentLength = text.length() - startIndex;
+        } else {
+            commentLength = endIndex - startIndex + match.capturedLength();
+        }
+
+        setFormat(startIndex, commentLength, multiLineCommentFormat);
+        startIndex = text.indexOf(commentStartExpression, startIndex + commentLength);
+    }
+}
+Editor::~Editor()
+{
+    if (highlighter) {
+        delete highlighter; // highlighter可能未被初始化或已由Qt管理
+        highlighter = nullptr;
+    }
+    // 注释掉的删除lineNumberArea和动作对象的代码
+}
