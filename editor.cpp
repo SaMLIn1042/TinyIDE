@@ -1148,7 +1148,6 @@ QList<QTextEdit::ExtraSelection> Editor::baseExtraSelections() const
     return extraSelections;
 }
 
-
 // 高亮匹配括号
 void Editor::highlightMatchingBracket()
 {
@@ -1305,8 +1304,6 @@ void Editor::updateBracketHighlight()
 // 更新括号高亮显示
 
 
-
-
 void Editor::wheelEvent(QWheelEvent *event)
 {
     // 检查是否按住Ctrl键
@@ -1341,7 +1338,6 @@ void Editor::wheelEvent(QWheelEvent *event)
         QPlainTextEdit::wheelEvent(event);
     }
 }
-
 EditorSyntaxHighlighter::EditorSyntaxHighlighter(QTextDocument *parent)
     : QSyntaxHighlighter(parent)
 {
@@ -1442,8 +1438,5 @@ Editor::~Editor()
         delete highlighter; // highlighter可能未被初始化或已由Qt管理
         highlighter = nullptr;
     }
-
+    // 注释掉的删除lineNumberArea和动作对象的代码
 }
-
-
-
