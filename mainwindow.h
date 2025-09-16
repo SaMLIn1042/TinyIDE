@@ -42,6 +42,7 @@ private:
     QVector<FileTabInfo> m_tabInfos;
     int m_currentTabIndex;
     Editor* currentEditor() const;
+    QFont getDefaultEditorFont() const;
 
 private slots:
     void on_actionCompile_triggered();
