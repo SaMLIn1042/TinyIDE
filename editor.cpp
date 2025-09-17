@@ -836,6 +836,11 @@ void Editor::handleFind()
     QString searchText = QInputDialog::getText(this, tr("查找"),
                                                tr("请输入要查找的内容:"), QLineEdit::Normal,
                                                m_searchText, &ok);
+
+    searchText.replace(QChar::ParagraphSeparator, '\n');
+    searchText.replace("\r\n", "\n");
+    searchText.replace('\r', '\n');
+
     if (!ok || searchText.isEmpty())
         return;
 
@@ -859,6 +864,10 @@ void Editor::handleReplace()
     QString searchText = QInputDialog::getText(this, tr("替换"),
                                                tr("请输入要查找的内容:"), QLineEdit::Normal,
                                                "", &ok);
+    searchText.replace(QChar::ParagraphSeparator, '\n');
+    searchText.replace("\r\n", "\n");
+    searchText.replace('\r', '\n');
+
     if (!ok || searchText.isEmpty())
         return;
 
@@ -950,6 +959,7 @@ void Editor::handleInsert()
 }
 
 // 高亮当前选中内容的所有匹配项
+// 高亮当前选中内容的所有匹配项（支持多行选中）
 void Editor::highlightSelection()
 {
     QTextCursor sel = textCursor();
@@ -960,18 +970,28 @@ void Editor::highlightSelection()
     if (selectedText.isEmpty())
         return;
 
+    // QTextCursor::selectedText() 用 U+2029 (Paragraph Separator) 表示换行，
+    // 需要把它转换为普通的 '\n'，以便 QTextDocument::find 能正确匹配多行。
+    selectedText.replace(QChar::ParagraphSeparator, '\n');
+    // 也兼容 \r 的情况（防止从其他来源粘贴的回车）
+    selectedText.replace("\r\n", "\n");
+    selectedText.replace('\r', '\n');
+
     // 保存搜索词并使用查找高亮机制
     m_searchText = selectedText;
     m_searchFlags = QTextDocument::FindFlags();
+    // 可选：如果你希望大小写敏感，设置 m_searchFlags |= QTextDocument::FindCaseSensitively;
+
     highlightAllMatches();
 
-    // 定位到第一个匹配项
+    // 定位到第一个匹配项（如果有）
     if (m_currentMatchIndex >= 0 && m_currentMatchIndex < m_matchCursors.size())
     {
         setTextCursor(m_matchCursors[m_currentMatchIndex]);
         highlightCurrentLine();
     }
 }
+
 
 // 清除所有查找高亮
 void Editor::clearAllHighlights()
@@ -1109,6 +1129,8 @@ void Editor::handleComment()
 void Editor::highlightAllMatches()
 {
     m_matchCursors.clear();
+
+    // 空搜索词时直接清理并刷新显示
     if (m_searchText.isEmpty())
     {
         m_currentMatchIndex = -1;
@@ -1116,19 +1138,34 @@ void Editor::highlightAllMatches()
         return;
     }
 
-    QTextCursor cursor(document());
-    while (true)
+    // 规范化搜索词：确保使用普通换行符 '\n'
+    QString search = m_searchText;
+    search.replace(QChar::ParagraphSeparator, '\n');
+    search.replace("\r\n", "\n");
+    search.replace('\r', '\n');
+
+    // 在整个文档的纯文本上查找（支持跨行匹配）
+    QString docText = toPlainText();
+    int pos = docText.indexOf(search, 0);
+    while (pos != -1)
     {
-        cursor = document()->find(m_searchText, cursor, m_searchFlags);
-        if (cursor.isNull())
-            break;
-        m_matchCursors.push_back(cursor);
-        cursor.setPosition(cursor.position()); // 防止空匹配循环
+        // 用字符偏移构造一个 QTextCursor 选区（可跨 block）
+        QTextCursor c(document());
+        c.setPosition(pos);
+        c.setPosition(pos + search.length(), QTextCursor::KeepAnchor);
+        m_matchCursors.push_back(c);
+
+        // 移到下一个搜索起点（避免重叠造成无限循环）
+        pos = docText.indexOf(search, pos + qMax(1, search.length()));
     }
 
+    // 更新当前匹配索引（置为第一个匹配）
     m_currentMatchIndex = m_matchCursors.isEmpty() ? -1 : 0;
+
+    // 刷新高亮（会在 highlightCurrentLine 中使用 m_matchCursors）
     highlightCurrentLine();
 }
+
 
 // 查找下一个匹配项
 void Editor::findNext()
