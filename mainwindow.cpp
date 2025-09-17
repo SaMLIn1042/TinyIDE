@@ -237,16 +237,35 @@ void MainWindow::onTabCloseRequested(int index)
     if (!info.isSaved)
     {
         QString fileName = info.filePath.isEmpty() ? "未命名文件" : QFileInfo(info.filePath).fileName();
-        QMessageBox::StandardButton reply;
-        reply = QMessageBox::question(this, "保存提示",
-                                      QString("%1 已修改，是否保存？").arg(fileName),
-                                      QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
 
-        if (reply == QMessageBox::Cancel)
+        // 创建自定义消息框，使用中文按钮
+        QMessageBox msgBox(QMessageBox::Question,
+                          "保存提示",
+                          QString("%1 已修改，是否保存？").arg(fileName),
+                          QMessageBox::NoButton,  // 不使用默认按钮
+                          this);
+
+        // 手动创建中文按钮
+        QPushButton* saveBtn = new QPushButton("保存", &msgBox);
+        QPushButton* discardBtn = new QPushButton("不保存", &msgBox);
+        QPushButton* cancelBtn = new QPushButton("取消", &msgBox);
+
+        // 添加按钮到消息框
+        msgBox.addButton(saveBtn, QMessageBox::ActionRole);
+        msgBox.addButton(discardBtn, QMessageBox::ActionRole);
+        msgBox.addButton(cancelBtn, QMessageBox::ActionRole);
+
+        // 设置默认按钮
+        msgBox.setDefaultButton(saveBtn);
+
+        // 显示弹窗
+        msgBox.exec();
+
+        if (msgBox.clickedButton() == cancelBtn)
         {
             return; // 取消关闭
         }
-        else if (reply == QMessageBox::Save)
+        else if (msgBox.clickedButton() == saveBtn)
         {
             // 保存当前文件
             m_currentTabIndex = index;
@@ -255,6 +274,7 @@ void MainWindow::onTabCloseRequested(int index)
                 return; // 保存失败取消关闭
             }
         }
+        // 点击"不保存"则继续关闭流程
     }
 
     // 移除标签页
@@ -567,16 +587,23 @@ void MainWindow::on_actionExit_triggered()
         if (!m_tabInfos[i].isSaved)
         {
             QString fileName = m_tabInfos[i].filePath.isEmpty() ? "未命名文件" : QFileInfo(m_tabInfos[i].filePath).fileName();
-            QMessageBox::StandardButton reply;
-            reply = QMessageBox::question(this, "保存提示",
-                                          QString("%1 已修改，是否保存？").arg(fileName),
-                                          QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+            QMessageBox msgBox(this);
+            msgBox.setWindowTitle("保存提示");
+            msgBox.setText(QString("%1 已修改，是否保存？").arg(fileName));
 
-            if (reply == QMessageBox::Cancel)
+            // 使用兼容的 ButtonRole 枚举值
+            QPushButton *saveBtn = msgBox.addButton("保存", QMessageBox::ButtonRole::YesRole);
+            QPushButton *discardBtn = msgBox.addButton("不保存", QMessageBox::ButtonRole::NoRole);
+            QPushButton *cancelBtn = msgBox.addButton("取消", QMessageBox::ButtonRole::RejectRole);
+            Q_UNUSED(discardBtn); // 标记变量为有意未使用，消除警告
+            msgBox.setDefaultButton(saveBtn);
+            msgBox.exec();
+
+            if (msgBox.clickedButton() == cancelBtn)
             {
                 return; // 取消退出
             }
-            else if (reply == QMessageBox::Save)
+            else if (msgBox.clickedButton() == saveBtn)
             {
                 m_currentTabIndex = i;
                 m_tabWidget->setCurrentIndex(i);
@@ -585,6 +612,7 @@ void MainWindow::on_actionExit_triggered()
                     return; // 保存失败取消退出
                 }
             }
+            // 点击"不保存"则继续检查下一个标签页
         }
     }
 

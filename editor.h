@@ -159,6 +159,8 @@ private:
     void updateBracketHighlight();                  // 同时确保这个也已声明
     void clearBracketHighlight();          // 清除括号高亮
     QList<QTextEdit::ExtraSelection> m_bracketSelections;
+    QString calculateIndentation() const;// 计算当前行的缩进字符串
+    int getIndentationLevel() const;// 获取当前行的缩进级别
 };
 
 #endif // EDITOR_H
