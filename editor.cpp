@@ -96,6 +96,58 @@ Editor::Editor(QWidget *parent) : QPlainTextEdit(parent),
     highlighter = new EditorSyntaxHighlighter(document());
 }
 
+// 获取当前行的缩进级别
+int Editor::getIndentationLevel() const
+{
+    QTextCursor cursor = textCursor();
+    cursor.movePosition(QTextCursor::StartOfLine);
+    cursor.movePosition(QTextCursor::EndOfLine, QTextCursor::KeepAnchor);
+    QString line = cursor.selectedText();
+
+    int level = 0;
+    int tabWidth = 4; // 假设使用4个空格作为缩进单位
+    int spaceCount = 0;
+
+    foreach (QChar c, line) {
+        if (c == ' ') {
+            spaceCount++;
+            if (spaceCount % tabWidth == 0) {
+                level++;
+            }
+        } else if (c == '\t') {
+            level++;
+            spaceCount = 0;
+        } else {
+            break;
+        }
+    }
+
+    return level;
+}
+
+// 计算当前应该使用的缩进字符串
+QString Editor::calculateIndentation() const
+{
+    QTextCursor cursor = textCursor();
+
+    // 获取当前行文本（已移除未使用的lineNumber变量）
+    cursor.movePosition(QTextCursor::StartOfLine);
+    cursor.movePosition(QTextCursor::EndOfLine, QTextCursor::KeepAnchor);
+    QString currentLine = cursor.selectedText();
+
+    // 基础缩进级别（当前行的缩进）
+    int indentLevel = getIndentationLevel();
+
+    // 如果当前行包含{，则下一行缩进级别+1
+    if (currentLine.contains('{') && !currentLine.contains('}')) {
+        indentLevel++;
+    }
+
+    // 创建缩进字符串（使用空格）
+    int tabWidth = 4;
+    return QString(tabWidth * indentLevel, ' ');
+}
+
 // 加载Qt中文翻译文件
 void Editor::loadChineseTranslation()
 {
@@ -113,11 +165,57 @@ void Editor::loadChineseTranslation()
     }
 }
 
-// 处理按键事件，实现成对符号自动补全
+// 处理按键事件，实现成对符号自动补全和自动缩进
 void Editor::keyPressEvent(QKeyEvent *event)
 {
+    // 处理回车键 - 自动缩进
+    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter)
+    {
+        // 获取当前缩进
+        QString indent = calculateIndentation();
+
+        // 插入换行和缩进
+        QTextCursor cursor = textCursor();
+        cursor.insertText("\n" + indent);
+        setTextCursor(cursor);
+
+        event->accept();
+        return;
+    }
+    // 处理右花括号 - 自动减少缩进
+    else if (event->key() == Qt::Key_BraceRight)
+    {
+        // 获取当前缩进级别并减1
+        int indentLevel = getIndentationLevel();
+        if (indentLevel > 0)
+        {
+            indentLevel--;
+        }
+
+        // 创建缩进字符串
+        int tabWidth = tabStopWidth() / fontMetrics().width(' '); // 使用当前Tab宽度设置
+        QString indent = QString(tabWidth * indentLevel, ' ');
+
+        // 插入右花括号
+        QTextCursor cursor = textCursor();
+        cursor.insertText("}");
+
+        // 如果是在行首，添加适当的缩进
+        cursor.movePosition(QTextCursor::StartOfLine);
+        cursor.movePosition(QTextCursor::EndOfLine, QTextCursor::KeepAnchor);
+        QString line = cursor.selectedText();
+        if (line.trimmed() == "}")
+        {
+            cursor.removeSelectedText();
+            cursor.insertText(indent + "}");
+        }
+
+        setTextCursor(cursor);
+        event->accept();
+        return;
+    }
     // 处理退格键（删除成对符号）
-    if (event->key() == Qt::Key_Backspace)
+    else if (event->key() == Qt::Key_Backspace)
     {
         QTextCursor cursor = textCursor();
 
@@ -128,7 +226,7 @@ void Editor::keyPressEvent(QKeyEvent *event)
             return;
         }
 
-        // 检查是否为成对符号并同时删除（增强小括号检测）
+        // 检查是否为成对符号并同时删除
         int pos = cursor.position();
         if (pos > 0) {
             cursor.setPosition(pos - 1);
@@ -138,14 +236,14 @@ void Editor::keyPressEvent(QKeyEvent *event)
             if (!leftChar.isEmpty() && m_matchingPairs.contains(leftChar[0])) {
                 QChar rightChar = m_matchingPairs[leftChar[0]];
 
-                // 检查右侧是否有匹配的括号
+                // 检查右侧是否有匹配的符号
                 if (pos < document()->characterCount()) {
                     cursor.setPosition(pos);
                     cursor.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor);
                     QString actualRightChar = cursor.selectedText();
 
                     if (actualRightChar[0] == rightChar) {
-                        // 同时删除左右括号
+                        // 同时删除左右符号
                         cursor.setPosition(pos - 1);
                         cursor.deleteChar();
                         cursor.deleteChar();
@@ -157,13 +255,13 @@ void Editor::keyPressEvent(QKeyEvent *event)
         }
     }
 
-    // 处理普通字符输入（确保小括号自动补全）
+    // 处理普通字符输入（成对符号自动补全）
     QString inputText = event->text();
     if (!inputText.isEmpty())
     {
         QChar inputChar = inputText.at(0);
 
-        // 检查是否是需要自动补全的左符号（包含小括号）
+        // 检查是否是需要自动补全的左符号
         if (m_matchingPairs.contains(inputChar) &&
             // 排除单引号和双引号在选中内容时的自动补全
             !( (inputChar == '\'' || inputChar == '"') && textCursor().hasSelection() ))
@@ -181,7 +279,7 @@ void Editor::keyPressEvent(QKeyEvent *event)
                 cursor.insertText(inputChar + selectedText + matchingChar);
                 cursor.setPosition(originalPos + selectedText.length() + 2);
             } else {
-                // 普通符号补全（包括小括号）
+                // 普通符号补全
                 cursor.insertText(inputChar);
                 cursor.insertText(matchingChar);
                 cursor.setPosition(originalPos + 1);
@@ -195,6 +293,9 @@ void Editor::keyPressEvent(QKeyEvent *event)
 
     // 其他情况调用父类方法处理
     QPlainTextEdit::keyPressEvent(event);
+
+    // 按键后更新括号高亮
+    highlightMatchingBracket();
 }
 
 
