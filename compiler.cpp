@@ -8,7 +8,7 @@
 #include <QRegularExpression>
 #include <QRegularExpressionMatch>
 
-// 编译器构造函数
+// 编译器构造函数，初始化进程和状态
 Compiler::Compiler(QObject *parent)
     : QObject(parent),
       m_process(new QProcess(this)),    // 编译进程
@@ -24,7 +24,7 @@ Compiler::Compiler(QObject *parent)
             this, &Compiler::onRunProcessFinished);
 }
 
-// 编译器析构函数
+// 编译器析构函数，确保进程终止
 Compiler::~Compiler()
 {
     // 确保所有进程在析构时终止
@@ -40,7 +40,7 @@ Compiler::~Compiler()
     }
 }
 
-// 编译源代码
+// 编译源代码：预处理、保存到临时文件、调用GCC编译
 void Compiler::compile(const QString &sourceCode)
 {
     m_compileSuccess = false; // 重置编译状态
@@ -158,18 +158,20 @@ void Compiler::compile(const QString &sourceCode)
     m_tempFilePath = tempFilePath;
 }
 
-// 运行程序
+// 运行编译成功的程序
 void Compiler::runProgram()
 {
     // 检查编译状态和可执行文件
-    if (!m_compileSuccess) {
+    if (!m_compileSuccess)
+    {
         emit runOutput("错误：请先成功编译程序");
         emit runFinished(false, "编译未成功");
         return;
     }
 
     // 添加额外的可执行文件存在检查
-    if (!QFile::exists(m_executablePath)) {
+    if (!QFile::exists(m_executablePath))
+    {
         emit runOutput("错误：可执行文件不存在，请重新编译");
         emit runFinished(false, "可执行文件不存在");
         m_compileSuccess = false; // 重置编译状态
@@ -244,7 +246,7 @@ void Compiler::stopProgram()
     }
 }
 
-// 编译进程完成处理
+// 编译进程完成处理：检查结果、清理临时文件、发送信号
 void Compiler::onProcessFinished(int exitCode, QProcess::ExitStatus)
 {
     // 获取编译输出
@@ -270,7 +272,7 @@ void Compiler::onProcessFinished(int exitCode, QProcess::ExitStatus)
     emit compileFinished(m_compileSuccess, result);
 }
 
-// 运行进程完成处理
+// 运行进程完成处理：获取输出、清理可执行文件、发送信号
 void Compiler::onRunProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
     Q_UNUSED(exitStatus) // 未使用参数
