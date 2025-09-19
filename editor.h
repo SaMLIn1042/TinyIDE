@@ -84,9 +84,6 @@ public:
     };
     int lineNumberAreaWidth();
     void lineNumberAreaPaintEvent(QPaintEvent *event);
-public slots:
-    void handleFind();
-    void handleReplace();
 
 signals:
     void lineCountExceeded();
@@ -103,6 +100,8 @@ private slots:
     void handleCopy();
     void handlePaste();
     void updatePasteState();
+    void handleFind();
+    void handleReplace();
     void findNext();
     void findPrevious();
     void clearFindHighlights();
@@ -152,7 +151,9 @@ private:
     QList<QTextEdit::ExtraSelection> m_bracketSelections;
     QString calculateIndentation() const;
     int getIndentationLevel() const;
+    void checkAndClearBracketHighlight();//及时清除匹配括号高亮
     void checkLineCountLimit();
+
 };
 
 #endif // EDITOR_H

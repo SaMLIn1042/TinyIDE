@@ -315,6 +315,38 @@ void Editor::onTextChanged()
         emit lineCountExceeded();
     }
     highlightNewLines();
+    clearBracketHighlight();
+}
+void Editor::checkAndClearBracketHighlight()
+{
+    if (!m_bracketSelections.isEmpty())
+    {
+        QTextCursor cursor = textCursor();
+        QTextDocument *doc = document();
+
+        // 检查高亮的括号是否还存在
+        bool shouldClear = false;
+        for (const auto &selection : m_bracketSelections)
+        {
+            int bracketPos = selection.cursor.position();
+            if (bracketPos >= doc->characterCount() ||
+                doc->characterAt(bracketPos) != selection.cursor.selectedText().at(0))
+            {
+                shouldClear = true;
+                break;
+            }
+        }
+
+        if (shouldClear)
+        {
+            clearBracketHighlight();
+        }
+        else
+        {
+            // 重新高亮以确保位置正确
+            highlightMatchingBracket();
+        }
+    }
 }
 
 // 高亮新增行（与原始文本对比）
@@ -585,19 +617,18 @@ void Editor::setupConnections()
         connect(copyAction, &QAction::triggered, this, &Editor::handleCopy);
     if (pasteAction)
         connect(pasteAction, &QAction::triggered, this, &Editor::handlePaste);
-    // NOTE: do NOT connect global actions like actionFind/actionReplace here.
-//    if (findAction)
-//        connect(findAction, &QAction::triggered, this, &Editor::handleFind);
-//    if (replaceAction)
-//        connect(replaceAction, &QAction::triggered, this, &Editor::handleReplace);
+    if (findAction)
+        connect(findAction, &QAction::triggered, this, &Editor::handleFind);
+    if (replaceAction)
+        connect(replaceAction, &QAction::triggered, this, &Editor::handleReplace);
     if (insertAction)
         connect(insertAction, &QAction::triggered, this, &Editor::handleInsert);
     if (fontAction)
         connect(fontAction, &QAction::triggered, this, &Editor::handleFontSettings);
-//    if (highlightSelectionAction)
-//        connect(highlightSelectionAction, &QAction::triggered, this, &Editor::highlightSelection);
-//    if (clearHighlightsAction)
-//        connect(clearHighlightsAction, &QAction::triggered, this, &Editor::clearAllHighlights);
+    if (highlightSelectionAction)
+        connect(highlightSelectionAction, &QAction::triggered, this, &Editor::highlightSelection);
+    if (clearHighlightsAction)
+        connect(clearHighlightsAction, &QAction::triggered, this, &Editor::clearAllHighlights);
 
     // 连接状态更新信号
     connect(this, &QPlainTextEdit::undoAvailable, undoAction, &QAction::setEnabled);
@@ -1071,8 +1102,12 @@ QList<QTextEdit::ExtraSelection> Editor::baseExtraSelections() const
 }
 
 // 高亮匹配括号
+// 高亮匹配括号
 void Editor::highlightMatchingBracket()
 {
+    // 清除旧的高亮
+    m_bracketSelections.clear();
+
     QTextCursor cursor = textCursor();
     int position = cursor.position();
     QTextDocument *doc = document();
@@ -1084,11 +1119,13 @@ void Editor::highlightMatchingBracket()
     if (position < doc->characterCount())
         currentChar = doc->characterAt(position);
 
+    int matchPos = -1;
+
     // 左括号匹配
     if (m_matchingPairs.contains(prevChar))
     {
         QChar matchChar = m_matchingPairs[prevChar];
-        int matchPos = findMatchingBracket(position - 1, prevChar, matchChar, 1);
+        matchPos = findMatchingBracket(position - 1, prevChar, matchChar, 1);
         if (matchPos != -1)
             highlightBracketPair(position - 1, matchPos);
     }
@@ -1102,12 +1139,17 @@ void Editor::highlightMatchingBracket()
                 matchChar = it.key();
                 break;
             }
-        int matchPos = findMatchingBracket(position, currentChar, matchChar, -1);
+        matchPos = findMatchingBracket(position, currentChar, matchChar, -1);
         if (matchPos != -1)
             highlightBracketPair(matchPos, position);
     }
-}
 
+    // 如果没有找到匹配的括号，确保高亮被清除
+    if (matchPos == -1)
+    {
+        clearBracketHighlight();
+    }
+}
 // 查找匹配括号
 int Editor::findMatchingBracket(int startPos, QChar bracket, QChar matchBracket, int direction)
 {
