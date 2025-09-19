@@ -124,6 +124,9 @@
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <widget class="QToolBar" name="toolBar">
+   <property name="enabled">
+    <bool>true</bool>
+   </property>
    <property name="windowTitle">
     <string>toolBar</string>
    </property>
@@ -137,7 +140,6 @@
    <addaction name="actionOpen"/>
    <addaction name="actionSave"/>
    <addaction name="actionSaveAs"/>
-   <addaction name="actionUndo"/>
    <addaction name="actionCompile"/>
    <addaction name="actionRun"/>
    <addaction name="actionStop"/>
@@ -175,6 +177,15 @@
   <action name="actionUndo">
    <property name="text">
     <string>撤销(&amp;U)</string>
+   </property>
+   <property name="visible">
+    <bool>true</bool>
+   </property>
+   <property name="iconVisibleInMenu">
+    <bool>true</bool>
+   </property>
+   <property name="shortcutVisibleInContextMenu">
+    <bool>true</bool>
    </property>
   </action>
   <action name="actionCopy">
