@@ -580,18 +580,19 @@ void Editor::setupConnections()
         connect(copyAction, &QAction::triggered, this, &Editor::handleCopy);
     if (pasteAction)
         connect(pasteAction, &QAction::triggered, this, &Editor::handlePaste);
-    if (findAction)
-        connect(findAction, &QAction::triggered, this, &Editor::handleFind);
-    if (replaceAction)
-        connect(replaceAction, &QAction::triggered, this, &Editor::handleReplace);
+    // NOTE: do NOT connect global actions like actionFind/actionReplace here.
+//    if (findAction)
+//        connect(findAction, &QAction::triggered, this, &Editor::handleFind);
+//    if (replaceAction)
+//        connect(replaceAction, &QAction::triggered, this, &Editor::handleReplace);
     if (insertAction)
         connect(insertAction, &QAction::triggered, this, &Editor::handleInsert);
     if (fontAction)
         connect(fontAction, &QAction::triggered, this, &Editor::handleFontSettings);
-    if (highlightSelectionAction)
-        connect(highlightSelectionAction, &QAction::triggered, this, &Editor::highlightSelection);
-    if (clearHighlightsAction)
-        connect(clearHighlightsAction, &QAction::triggered, this, &Editor::clearAllHighlights);
+//    if (highlightSelectionAction)
+//        connect(highlightSelectionAction, &QAction::triggered, this, &Editor::highlightSelection);
+//    if (clearHighlightsAction)
+//        connect(clearHighlightsAction, &QAction::triggered, this, &Editor::clearAllHighlights);
 
     // 连接状态更新信号
     connect(this, &QPlainTextEdit::undoAvailable, undoAction, &QAction::setEnabled);

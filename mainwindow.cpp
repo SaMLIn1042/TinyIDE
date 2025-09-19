@@ -34,13 +34,24 @@ MainWindow::MainWindow(QWidget *parent)
     aClear->setObjectName("actionClearHighlights");
     ui->toolBar->addAction(aClear);
 
+    ui->actionFind->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_F));
+    ui->actionReplace->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_H));
+
     // 获取编辑器组件引用
-    m_editor = ui->editor;
+    //m_editor = ui->editor;
 
     // 设置高亮功能
-    m_editor->setHighlightActions(aHighlight, aClear);
-    connect(aHighlight, SIGNAL(triggered()), m_editor, SLOT(highlightSelection()));
-    connect(aClear, SIGNAL(triggered()), m_editor, SLOT(clearAllHighlights()));
+//    m_editor->setHighlightActions(aHighlight, aClear);
+//    connect(aHighlight, SIGNAL(triggered()), m_editor, SLOT(highlightSelection()));
+//    connect(aClear, SIGNAL(triggered()), m_editor, SLOT(clearAllHighlights()));
+      connect(aHighlight, &QAction::triggered, this, [this]() {
+            Editor *e = currentEditor();
+            if (e) e->highlightSelection();
+        });
+      connect(aClear, &QAction::triggered, this, [this]() {
+            Editor *e = currentEditor();
+            if (e) e->clearAllHighlights();
+        });
 
     // 创建标签页控件
     m_tabWidget = new QTabWidget(this);
@@ -140,6 +151,23 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 设置初始窗口标题
     setWindowTitle("TinyIDE - 未命名");
+    // 全局查找/替换由 MainWindow 转发到当前编辑器
+    connect(ui->actionFind, &QAction::triggered, this, [this]() {
+        Editor *e = currentEditor();
+        if (e) e->handleFind();
+    });
+    connect(ui->actionReplace, &QAction::triggered, this, [this]() {
+        Editor *e = currentEditor();
+        if (e) e->handleReplace();
+    });
+    connect(aHighlight, &QAction::triggered, this, [this]() {
+        Editor *e = currentEditor();
+        if (e) e->highlightSelection();
+    });
+    connect(aClear, &QAction::triggered, this, [this]() {
+        Editor *e = currentEditor();
+        if (e) e->clearAllHighlights();
+    });
 
     // 设置停止按钮的快捷键和初始状态
     ui->actionStop->setShortcut(QKeySequence(Qt::Key_Escape));
@@ -169,8 +197,8 @@ MainWindow::MainWindow(QWidget *parent)
             });
 
     // 延迟调用，确保编辑器能够找到主窗口
-    QTimer::singleShot(100, this, [this, editor]()
-                       { editor->findActionsFromMainWindow(); });
+    //QTimer::singleShot(100, this, [this, editor]()
+    //                   { editor->findActionsFromMainWindow(); });
 }
 
 // 析构函数：清理资源
@@ -431,8 +459,8 @@ void MainWindow::on_actionNew_triggered()
     m_tabInfos.append(info);
 
     // 延迟调用，确保编辑器能够找到主窗口
-    QTimer::singleShot(100, this, [editor]()
-                       { editor->findActionsFromMainWindow(); });
+    //QTimer::singleShot(100, this, [editor]()
+    //                  { editor->findActionsFromMainWindow(); });
 
     // 切换到新标签页
     m_tabWidget->setCurrentIndex(newIndex);
@@ -495,8 +523,8 @@ void MainWindow::on_actionOpen_triggered()
     m_tabInfos.append(info);
 
     // 延迟调用，确保编辑器能够找到主窗口
-    QTimer::singleShot(100, this, [editor]()
-                       { editor->findActionsFromMainWindow(); });
+    //QTimer::singleShot(100, this, [editor]()
+    //                   { editor->findActionsFromMainWindow(); });
 
     // 切换到新标签页
     m_tabWidget->setCurrentIndex(newIndex);
