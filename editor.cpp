@@ -48,12 +48,13 @@ Editor::Editor(QWidget *parent) : QPlainTextEdit(parent),
     m_matchingPairs.insert('\'', '\'');
     m_matchingPairs.insert('"', '"');
 
-    // 连接行号和光标相关信号
+    // 连接行号和光标等相关信号
     connect(this, &Editor::blockCountChanged, this, &Editor::updateLineNumberAreaWidth);
     connect(this, &Editor::updateRequest, this, &Editor::updateLineNumberArea);
     connect(this, &Editor::cursorPositionChanged, this, &Editor::highlightCurrentLine);
     connect(this, &Editor::textChanged, this, &Editor::onTextChanged);
     connect(this, &Editor::cursorPositionChanged, this, &Editor::highlightMatchingBracket);
+    connect(this, &QPlainTextEdit::textChanged, this, &Editor::checkLineCountLimit);
 
     // 初始化界面状态
     updateLineNumberAreaWidth(0);
@@ -309,6 +310,10 @@ void Editor::lineNumberAreaPaintEvent(QPaintEvent *event)
 // 文本变化回调
 void Editor::onTextChanged()
 {
+    // 检查行数是否超过2000
+    if (document()->lineCount() > 2000) {
+        emit lineCountExceeded();
+    }
     highlightNewLines();
     clearBracketHighlight();
 }
@@ -1371,6 +1376,18 @@ void EditorSyntaxHighlighter::highlightBlock(const QString &text)
 
         setFormat(startIndex, commentLength, multiLineCommentFormat);
         startIndex = text.indexOf(commentStartExpression, startIndex + commentLength);
+    }
+}
+
+bool Editor::isLineCountValid() const {
+    return document()->blockCount() <= 2000;
+}
+
+void Editor::checkLineCountLimit() {
+    if (document()->blockCount() > 2000) {
+        // 阻止进一步输入并提示用户
+        undo(); // 撤销最后一次操作（即超限的输入）
+        emit lineCountExceeded();
     }
 }
 

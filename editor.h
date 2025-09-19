@@ -59,7 +59,9 @@ public:
     void findActionsFromMainWindow();
     void setHighlightActions(QAction *highlight, QAction *clear);
     void clearHighlights();
-
+    void highlightSelection();
+    void clearAllHighlights();
+    bool isLineCountValid() const;
     // 行号显示区域
     class LineNumberArea : public QWidget
     {
@@ -82,6 +84,9 @@ public:
     };
     int lineNumberAreaWidth();
     void lineNumberAreaPaintEvent(QPaintEvent *event);
+
+signals:
+    void lineCountExceeded();
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
@@ -138,8 +143,6 @@ private:
     QList<QTextEdit::ExtraSelection> baseExtraSelections() const;
     QList<QTextEdit::ExtraSelection> m_selectionExtraSelections;
     void highlightAllMatches();
-    void highlightSelection();
-    void clearAllHighlights();
     QHash<QChar, QChar> m_matchingPairs;
     int findMatchingBracket(int startPos, QChar bracket, QChar matchBracket, int direction);
     void highlightBracketPair(int pos1, int pos2);
@@ -149,6 +152,8 @@ private:
     QString calculateIndentation() const;
     int getIndentationLevel() const;
     void checkAndClearBracketHighlight();//及时清除匹配括号高亮
+    void checkLineCountLimit();
+
 };
 
 #endif // EDITOR_H

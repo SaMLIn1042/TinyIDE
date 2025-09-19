@@ -410,11 +410,17 @@ void MainWindow::handleRunOutput(const QString &output)
 // 新建文件处理
 void MainWindow::on_actionNew_triggered()
 {
+
     // 获取默认字体
     QFont defaultFont = getDefaultEditorFont();
 
     // 创建新编辑器
     Editor *editor = new Editor();
+
+    // 连接行数超限信号
+    connect(editor, &Editor::lineCountExceeded, this, [this]() {
+        QMessageBox::warning(this, "警告", "文本行数不得超过2000行！");
+    });
 
     // 设置初始示例代码
     QString initialCode =
@@ -498,11 +504,25 @@ void MainWindow::on_actionOpen_triggered()
     // 确保新编辑器使用默认字体
     editor->setEditorFont(defaultFont);
 
-    // 显示文件内容
     QTextStream in(&file);
-    editor->setPlainText(in.readAll());
-    editor->setOriginalText(in.readAll());
+    QString content = in.readAll();
+    // 检查行数
+    if (content.count('\n') + 1 > 2000) {
+        QMessageBox::critical(this, "错误", "文件行数超过2000行，无法打开！");
+        file.close();
+        delete editor; // 清理已创建的编辑器
+        return;
+    }
     file.close();
+
+    // 设置编辑器内容
+    editor->setPlainText(content);
+    editor->setOriginalText(content);
+
+    // 连接行数超限信号
+    connect(editor, &Editor::lineCountExceeded, this, [this]() {
+        QMessageBox::warning(this, "警告", "文本行数不得超过2000行！");
+    });
 
     // 连接编辑器内容变化信号
     connect(editor, &QPlainTextEdit::textChanged,
