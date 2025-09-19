@@ -13,12 +13,12 @@ namespace Ui
     class MainWindow;
 }
 
-// 文件标签信息结构体
-struct FileTabInfo {
-    Editor* editor;
+struct FileTabInfo
+{
+    Editor *editor;
     QString filePath;
     bool isSaved;
-    QString displayName; // 显示在标签上的名称
+    QString displayName;
 };
 
 class MainWindow : public QMainWindow
@@ -38,10 +38,9 @@ private:
     QTabWidget *m_tabWidget;
     QLineEdit *m_inputLineEdit;
     bool m_isSaved;
-    // 存储标签页信息
     QVector<FileTabInfo> m_tabInfos;
     int m_currentTabIndex;
-    Editor* currentEditor() const;
+    Editor *currentEditor() const;
     QFont getDefaultEditorFont() const;
 
 private slots:
@@ -59,7 +58,6 @@ private slots:
     void on_actionStop_triggered();
     void onEditorTextChanged();
     void onSendInput();
-    // 新增的槽函数
     void onTabChanged(int index);
     void onTabCloseRequested(int index);
     void updateTabTitle(int index);

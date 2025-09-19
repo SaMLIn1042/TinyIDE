@@ -33,7 +33,7 @@ private:
     QString m_executablePath;
     QString m_tempFilePath;
     bool m_compileSuccess;
-    bool m_isTerminalOutput; // 新增：是否在终端输出模式
+    bool m_isTerminalOutput;
 };
 
 #endif // COMPILER_H

@@ -25,7 +25,7 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
-    // 高亮功能相关操作 - 第一部分
+    // 高亮功能相关操作
     QAction *aHighlight = new QAction(tr("高亮所选"), this);
     aHighlight->setObjectName("actionHighlightSelection");
     ui->toolBar->addAction(aHighlight);
@@ -33,16 +33,14 @@ MainWindow::MainWindow(QWidget *parent)
     QAction *aClear = new QAction(tr("清除高亮"), this);
     aClear->setObjectName("actionClearHighlights");
     ui->toolBar->addAction(aClear);
-    // -------------------------------------------------
 
     // 获取编辑器组件引用
     m_editor = ui->editor;
 
-    // 高亮功能相关操作 - 第二部分
+    // 设置高亮功能
     m_editor->setHighlightActions(aHighlight, aClear);
     connect(aHighlight, SIGNAL(triggered()), m_editor, SLOT(highlightSelection()));
     connect(aClear, SIGNAL(triggered()), m_editor, SLOT(clearAllHighlights()));
-    // -------------------------------------------------
 
     // 创建标签页控件
     m_tabWidget = new QTabWidget(this);
@@ -171,9 +169,8 @@ MainWindow::MainWindow(QWidget *parent)
             });
 
     // 延迟调用，确保编辑器能够找到主窗口
-    QTimer::singleShot(100, this, [this, editor]() {
-        editor->findActionsFromMainWindow();
-    });
+    QTimer::singleShot(100, this, [this, editor]()
+                       { editor->findActionsFromMainWindow(); });
 }
 
 // 析构函数：清理资源
@@ -182,6 +179,7 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
+// 获取默认编辑器字体
 QFont MainWindow::getDefaultEditorFont() const
 {
     QFont defaultFont;
@@ -192,15 +190,17 @@ QFont MainWindow::getDefaultEditorFont() const
         "Source Code Pro",
         "Monaco",
         "Courier New",
-        "Monospace"  // 通用等宽字体
+        "Monospace" // 通用等宽字体
     };
 
     // 检查系统是否有首选字体
     QFontDatabase fontDb;
     QString selectedFont = "Monospace"; // 默认回退
 
-    for (const QString &fontName : preferredFonts) {
-        if (fontDb.families().contains(fontName)) {
+    for (const QString &fontName : preferredFonts)
+    {
+        if (fontDb.families().contains(fontName))
+        {
             selectedFont = fontName;
             qDebug() << "使用字体:" << fontName;
             break;
@@ -217,7 +217,8 @@ QFont MainWindow::getDefaultEditorFont() const
 // 标签页切换处理
 void MainWindow::onTabChanged(int index)
 {
-    if (index < 0 || index >= m_tabInfos.size()) return;
+    if (index < 0 || index >= m_tabInfos.size())
+        return;
 
     m_currentTabIndex = index;
     FileTabInfo &info = m_tabInfos[index];
@@ -229,7 +230,8 @@ void MainWindow::onTabChanged(int index)
 // 标签页关闭请求处理
 void MainWindow::onTabCloseRequested(int index)
 {
-    if (index < 0 || index >= m_tabInfos.size()) return;
+    if (index < 0 || index >= m_tabInfos.size())
+        return;
 
     FileTabInfo &info = m_tabInfos[index];
 
@@ -237,16 +239,35 @@ void MainWindow::onTabCloseRequested(int index)
     if (!info.isSaved)
     {
         QString fileName = info.filePath.isEmpty() ? "未命名文件" : QFileInfo(info.filePath).fileName();
-        QMessageBox::StandardButton reply;
-        reply = QMessageBox::question(this, "保存提示",
-                                      QString("%1 已修改，是否保存？").arg(fileName),
-                                      QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
 
-        if (reply == QMessageBox::Cancel)
+        // 创建自定义消息框，使用中文按钮
+        QMessageBox msgBox(QMessageBox::Question,
+                           "保存提示",
+                           QString("%1 已修改，是否保存？").arg(fileName),
+                           QMessageBox::NoButton, // 不使用默认按钮
+                           this);
+
+        // 手动创建中文按钮
+        QPushButton *saveBtn = new QPushButton("保存", &msgBox);
+        QPushButton *discardBtn = new QPushButton("不保存", &msgBox);
+        QPushButton *cancelBtn = new QPushButton("取消", &msgBox);
+
+        // 添加按钮到消息框
+        msgBox.addButton(saveBtn, QMessageBox::ActionRole);
+        msgBox.addButton(discardBtn, QMessageBox::ActionRole);
+        msgBox.addButton(cancelBtn, QMessageBox::ActionRole);
+
+        // 设置默认按钮
+        msgBox.setDefaultButton(saveBtn);
+
+        // 显示弹窗
+        msgBox.exec();
+
+        if (msgBox.clickedButton() == cancelBtn)
         {
             return; // 取消关闭
         }
-        else if (reply == QMessageBox::Save)
+        else if (msgBox.clickedButton() == saveBtn)
         {
             // 保存当前文件
             m_currentTabIndex = index;
@@ -255,6 +276,7 @@ void MainWindow::onTabCloseRequested(int index)
                 return; // 保存失败取消关闭
             }
         }
+        // 点击"不保存"则继续关闭流程
     }
 
     // 移除标签页
@@ -263,12 +285,14 @@ void MainWindow::onTabCloseRequested(int index)
     m_tabInfos.remove(index);
 
     // 如果关闭的是当前标签页，更新当前索引
-    if (m_currentTabIndex >= index) {
+    if (m_currentTabIndex >= index)
+    {
         m_currentTabIndex--;
     }
 
     // 如果没有标签页了，创建一个新的
-    if (m_tabInfos.isEmpty()) {
+    if (m_tabInfos.isEmpty())
+    {
         on_actionNew_triggered();
     }
 }
@@ -276,7 +300,8 @@ void MainWindow::onTabCloseRequested(int index)
 // 更新标签页标题
 void MainWindow::updateTabTitle(int index)
 {
-    if (index < 0 || index >= m_tabInfos.size()) return;
+    if (index < 0 || index >= m_tabInfos.size())
+        return;
 
     FileTabInfo &info = m_tabInfos[index];
     QString title = info.displayName + (info.isSaved ? "" : "*");
@@ -286,8 +311,9 @@ void MainWindow::updateTabTitle(int index)
 // 编译操作处理
 void MainWindow::on_actionCompile_triggered()
 {
-    Editor* editor = currentEditor();
-    if (!editor) return;
+    Editor *editor = currentEditor();
+    if (!editor)
+        return;
 
     // 添加编译分隔线
     ui->outputTextEdit->appendPlainText("\n--- 开始编译 ---");
@@ -299,9 +325,10 @@ void MainWindow::on_actionCompile_triggered()
 }
 
 // 获取当前活动的编辑器
-Editor* MainWindow::currentEditor() const
+Editor *MainWindow::currentEditor() const
 {
-    if (m_currentTabIndex >= 0 && m_currentTabIndex < m_tabInfos.size()) {
+    if (m_currentTabIndex >= 0 && m_currentTabIndex < m_tabInfos.size())
+    {
         return m_tabInfos[m_currentTabIndex].editor;
     }
     return nullptr;
@@ -310,8 +337,9 @@ Editor* MainWindow::currentEditor() const
 // 运行操作处理
 void MainWindow::on_actionRun_triggered()
 {
-    Editor* editor = currentEditor();
-    if (!editor) return;
+    Editor *editor = currentEditor();
+    if (!editor)
+        return;
 
     ui->outputTextEdit->appendPlainText("\n--- 运行程序 ---");
     statusBar()->showMessage("运行中...");
@@ -373,8 +401,9 @@ void MainWindow::on_actionNew_triggered()
     // 确保应用默认字体
     editor->setEditorFont(defaultFont);
 
-    // 连接编辑器内容变化信号 - 使用lambda确保正确绑定
-    connect(editor, &QPlainTextEdit::textChanged, this, [this, editor]() {
+    // 连接编辑器内容变化信号
+    connect(editor, &QPlainTextEdit::textChanged, this, [this, editor]()
+            {
         // 直接调用处理函数，但传递正确的编辑器
         for (int i = 0; i < m_tabInfos.size(); ++i) {
             if (m_tabInfos[i].editor == editor) {
@@ -388,8 +417,7 @@ void MainWindow::on_actionNew_triggered()
                 }
                 break;
             }
-        }
-    });
+        } });
 
     // 添加到标签页
     int newIndex = m_tabWidget->addTab(editor, "未命名");
@@ -403,9 +431,8 @@ void MainWindow::on_actionNew_triggered()
     m_tabInfos.append(info);
 
     // 延迟调用，确保编辑器能够找到主窗口
-    QTimer::singleShot(100, this, [editor]() {
-        editor->findActionsFromMainWindow();
-    });
+    QTimer::singleShot(100, this, [editor]()
+                       { editor->findActionsFromMainWindow(); });
 
     // 切换到新标签页
     m_tabWidget->setCurrentIndex(newIndex);
@@ -468,9 +495,8 @@ void MainWindow::on_actionOpen_triggered()
     m_tabInfos.append(info);
 
     // 延迟调用，确保编辑器能够找到主窗口
-    QTimer::singleShot(100, this, [editor]() {
-        editor->findActionsFromMainWindow();
-    });
+    QTimer::singleShot(100, this, [editor]()
+                       { editor->findActionsFromMainWindow(); });
 
     // 切换到新标签页
     m_tabWidget->setCurrentIndex(newIndex);
@@ -483,7 +509,8 @@ void MainWindow::on_actionOpen_triggered()
 // 保存文件处理
 bool MainWindow::on_actionSave_triggered()
 {
-    if (m_currentTabIndex < 0 || m_currentTabIndex >= m_tabInfos.size()) return false;
+    if (m_currentTabIndex < 0 || m_currentTabIndex >= m_tabInfos.size())
+        return false;
 
     FileTabInfo &info = m_tabInfos[m_currentTabIndex];
 
@@ -520,7 +547,8 @@ bool MainWindow::on_actionSave_triggered()
 // 另存为文件处理
 bool MainWindow::on_actionSaveAs_triggered()
 {
-    if (m_currentTabIndex < 0 || m_currentTabIndex >= m_tabInfos.size()) return false;
+    if (m_currentTabIndex < 0 || m_currentTabIndex >= m_tabInfos.size())
+        return false;
 
     FileTabInfo &info = m_tabInfos[m_currentTabIndex];
 
@@ -552,7 +580,8 @@ bool MainWindow::on_actionSaveAs_triggered()
 // 关闭文件处理
 void MainWindow::on_actionClose_triggered()
 {
-    if (m_currentTabIndex < 0 || m_currentTabIndex >= m_tabInfos.size()) return;
+    if (m_currentTabIndex < 0 || m_currentTabIndex >= m_tabInfos.size())
+        return;
 
     // 触发关闭当前标签页
     onTabCloseRequested(m_currentTabIndex);
@@ -567,16 +596,23 @@ void MainWindow::on_actionExit_triggered()
         if (!m_tabInfos[i].isSaved)
         {
             QString fileName = m_tabInfos[i].filePath.isEmpty() ? "未命名文件" : QFileInfo(m_tabInfos[i].filePath).fileName();
-            QMessageBox::StandardButton reply;
-            reply = QMessageBox::question(this, "保存提示",
-                                          QString("%1 已修改，是否保存？").arg(fileName),
-                                          QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+            QMessageBox msgBox(this);
+            msgBox.setWindowTitle("保存提示");
+            msgBox.setText(QString("%1 已修改，是否保存？").arg(fileName));
 
-            if (reply == QMessageBox::Cancel)
+            // 使用兼容的 ButtonRole 枚举值
+            QPushButton *saveBtn = msgBox.addButton("保存", QMessageBox::ButtonRole::YesRole);
+            QPushButton *discardBtn = msgBox.addButton("不保存", QMessageBox::ButtonRole::NoRole);
+            QPushButton *cancelBtn = msgBox.addButton("取消", QMessageBox::ButtonRole::RejectRole);
+            Q_UNUSED(discardBtn); // 标记变量为有意未使用，消除警告
+            msgBox.setDefaultButton(saveBtn);
+            msgBox.exec();
+
+            if (msgBox.clickedButton() == cancelBtn)
             {
                 return; // 取消退出
             }
-            else if (reply == QMessageBox::Save)
+            else if (msgBox.clickedButton() == saveBtn)
             {
                 m_currentTabIndex = i;
                 m_tabWidget->setCurrentIndex(i);
@@ -585,6 +621,7 @@ void MainWindow::on_actionExit_triggered()
                     return; // 保存失败取消退出
                 }
             }
+            // 点击"不保存"则继续检查下一个标签页
         }
     }
 
@@ -604,21 +641,26 @@ void MainWindow::on_actionStop_triggered()
 void MainWindow::onEditorTextChanged()
 {
     // 确定是哪个编辑器发出的信号
-    Editor* senderEditor = qobject_cast<Editor*>(sender());
-    if (!senderEditor) return;
+    Editor *senderEditor = qobject_cast<Editor *>(sender());
+    if (!senderEditor)
+        return;
 
     // 找到对应的标签页
-    for (int i = 0; i < m_tabInfos.size(); ++i) {
-        if (m_tabInfos[i].editor == senderEditor) {
+    for (int i = 0; i < m_tabInfos.size(); ++i)
+    {
+        if (m_tabInfos[i].editor == senderEditor)
+        {
             FileTabInfo &info = m_tabInfos[i];
 
             // 标记文件为未保存状态
-            if (info.isSaved) {
+            if (info.isSaved)
+            {
                 info.isSaved = false;
                 updateTabTitle(i);
 
                 // 如果是当前标签页，更新窗口标题
-                if (i == m_currentTabIndex) {
+                if (i == m_currentTabIndex)
+                {
                     setWindowTitle("TinyIDE - " + info.displayName + "*");
                 }
             }
