@@ -59,7 +59,8 @@ public:
     void findActionsFromMainWindow();
     void setHighlightActions(QAction *highlight, QAction *clear);
     void clearHighlights();
-
+    void highlightSelection();
+    void clearAllHighlights();
     // 行号显示区域
     class LineNumberArea : public QWidget
     {
@@ -82,6 +83,9 @@ public:
     };
     int lineNumberAreaWidth();
     void lineNumberAreaPaintEvent(QPaintEvent *event);
+public slots:
+    void handleFind();
+    void handleReplace();
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
@@ -95,8 +99,8 @@ private slots:
     void handleCopy();
     void handlePaste();
     void updatePasteState();
-    void handleFind();
-    void handleReplace();
+//    void handleFind();
+//    void handleReplace();
     void findNext();
     void findPrevious();
     void clearFindHighlights();
@@ -138,8 +142,8 @@ private:
     QList<QTextEdit::ExtraSelection> baseExtraSelections() const;
     QList<QTextEdit::ExtraSelection> m_selectionExtraSelections;
     void highlightAllMatches();
-    void highlightSelection();
-    void clearAllHighlights();
+//    void highlightSelection();
+//    void clearAllHighlights();
     QHash<QChar, QChar> m_matchingPairs;
     int findMatchingBracket(int startPos, QChar bracket, QChar matchBracket, int direction);
     void highlightBracketPair(int pos1, int pos2);
