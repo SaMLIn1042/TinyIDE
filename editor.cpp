@@ -48,12 +48,15 @@ Editor::Editor(QWidget *parent) : QPlainTextEdit(parent),
     m_matchingPairs.insert('\'', '\'');
     m_matchingPairs.insert('"', '"');
 
-    // 连接行号和光标相关信号
+
     connect(this, &Editor::blockCountChanged, this, &Editor::updateLineNumberAreaWidth);
     connect(this, &Editor::updateRequest, this, &Editor::updateLineNumberArea);
     connect(this, &Editor::cursorPositionChanged, this, &Editor::highlightCurrentLine);
     connect(this, &Editor::textChanged, this, &Editor::onTextChanged);
     connect(this, &Editor::cursorPositionChanged, this, &Editor::highlightMatchingBracket);
+
+    connect(this, &QPlainTextEdit::textChanged, this, &Editor::checkLineCountLimit);
+
 
     // 初始化界面状态
     updateLineNumberAreaWidth(0);
@@ -177,6 +180,21 @@ void Editor::keyPressEvent(QKeyEvent *event)
             cursor.insertText(indent + "}");
         }
 
+        int tabWidth = tabStopWidth() / fontMetrics().width(' ');
+        QString indent = QString(tabWidth * indentLevel, ' ');
+
+        QTextCursor cursor = textCursor();
+        cursor.insertText("}");
+
+        // 调整行首缩进
+        cursor.movePosition(QTextCursor::StartOfLine);
+        cursor.movePosition(QTextCursor::EndOfLine, QTextCursor::KeepAnchor);
+        QString line = cursor.selectedText();
+        if (line.trimmed() == "}")
+        {
+            cursor.removeSelectedText();
+            cursor.insertText(indent + "}");
+        }
         setTextCursor(cursor);
         event->accept();
         return;
@@ -309,8 +327,13 @@ void Editor::lineNumberAreaPaintEvent(QPaintEvent *event)
 // 文本变化回调
 void Editor::onTextChanged()
 {
+    // 检查行数是否超过2000
+    if (document()->lineCount() > 2000) {
+        emit lineCountExceeded();
+    }
     highlightNewLines();
     clearBracketHighlight();
+
 }
 void Editor::checkAndClearBracketHighlight()
 {
@@ -332,6 +355,36 @@ void Editor::checkAndClearBracketHighlight()
             }
         }
 
+        if (shouldClear)
+        {
+            clearBracketHighlight();
+        }
+        else
+        {
+            // 重新高亮以确保位置正确
+            highlightMatchingBracket();
+        }
+    }
+}
+void Editor::checkAndClearBracketHighlight()
+{
+    if (!m_bracketSelections.isEmpty())
+    {
+        QTextCursor cursor = textCursor();
+        QTextDocument *doc = document();
+
+        // 检查高亮的括号是否还存在
+        bool shouldClear = false;
+        for (const auto &selection : m_bracketSelections)
+        {
+            int bracketPos = selection.cursor.position();
+            if (bracketPos >= doc->characterCount() ||
+                doc->characterAt(bracketPos) != selection.cursor.selectedText().at(0))
+            {
+                shouldClear = true;
+                break;
+            }
+        }
         if (shouldClear)
         {
             clearBracketHighlight();
@@ -1371,6 +1424,19 @@ void EditorSyntaxHighlighter::highlightBlock(const QString &text)
 
         setFormat(startIndex, commentLength, multiLineCommentFormat);
         startIndex = text.indexOf(commentStartExpression, startIndex + commentLength);
+    }
+}
+
+
+bool Editor::isLineCountValid() const {
+    return document()->blockCount() <= 2000;
+}
+
+void Editor::checkLineCountLimit() {
+    if (document()->blockCount() > 2000) {
+        // 阻止进一步输入并提示用户
+        undo(); // 撤销最后一次操作（即超限的输入）
+        emit lineCountExceeded();
     }
 }
 

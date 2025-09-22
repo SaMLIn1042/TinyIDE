@@ -1,3 +1,4 @@
+
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include <QScrollBar>
@@ -685,3 +686,4 @@ void MainWindow::onSendInput()
         m_inputLineEdit->clear();
     }
 }
+
