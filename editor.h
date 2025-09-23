@@ -143,6 +143,10 @@ private:
     QList<QTextEdit::ExtraSelection> baseExtraSelections() const;
     QList<QTextEdit::ExtraSelection> m_selectionExtraSelections;
     void highlightAllMatches();
+
+    void highlightSelection();
+    void clearAllHighlights();
+
     QHash<QChar, QChar> m_matchingPairs;
     int findMatchingBracket(int startPos, QChar bracket, QChar matchBracket, int direction);
     void highlightBracketPair(int pos1, int pos2);
@@ -153,7 +157,6 @@ private:
     int getIndentationLevel() const;
     void checkAndClearBracketHighlight();//及时清除匹配括号高亮
     void checkLineCountLimit();
-
 };
 
 #endif // EDITOR_H
