@@ -61,9 +61,13 @@ public:
     void clearHighlights();
     void highlightSelection();
     void clearAllHighlights();
+
     void handleFind();
     void handleReplace();
     void lineCountExceeded();
+
+    bool isLineCountValid() const;
+
     // 行号显示区域
     class LineNumberArea : public QWidget
     {
@@ -87,11 +91,18 @@ public:
     int lineNumberAreaWidth();
     void lineNumberAreaPaintEvent(QPaintEvent *event);
 
+signals:
+    void lineCountExceeded();
+
 protected:
     void resizeEvent(QResizeEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void loadChineseTranslation();
     void wheelEvent(QWheelEvent *event) override;
+
+public slots:
+    void handleFind();
+    void handleReplace();
 
 private slots:
     void handleUndo();
@@ -149,6 +160,7 @@ private:
     QString calculateIndentation() const;
     int getIndentationLevel() const;
     void checkAndClearBracketHighlight();//及时清除匹配括号高亮
+    void checkLineCountLimit();
 };
 
 #endif // EDITOR_H
