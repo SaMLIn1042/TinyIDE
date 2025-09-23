@@ -1,3 +1,4 @@
+
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include <QScrollBar>
@@ -34,24 +35,13 @@ MainWindow::MainWindow(QWidget *parent)
     aClear->setObjectName("actionClearHighlights");
     ui->toolBar->addAction(aClear);
 
-    ui->actionFind->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_F));
-    ui->actionReplace->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_H));
-
     // 获取编辑器组件引用
-    //m_editor = ui->editor;
+    m_editor = ui->editor;
 
     // 设置高亮功能
-//    m_editor->setHighlightActions(aHighlight, aClear);
-//    connect(aHighlight, SIGNAL(triggered()), m_editor, SLOT(highlightSelection()));
-//    connect(aClear, SIGNAL(triggered()), m_editor, SLOT(clearAllHighlights()));
-      connect(aHighlight, &QAction::triggered, this, [this]() {
-            Editor *e = currentEditor();
-            if (e) e->highlightSelection();
-        });
-      connect(aClear, &QAction::triggered, this, [this]() {
-            Editor *e = currentEditor();
-            if (e) e->clearAllHighlights();
-        });
+    m_editor->setHighlightActions(aHighlight, aClear);
+    connect(aHighlight, SIGNAL(triggered()), m_editor, SLOT(highlightSelection()));
+    connect(aClear, SIGNAL(triggered()), m_editor, SLOT(clearAllHighlights()));
 
     // 创建标签页控件
     m_tabWidget = new QTabWidget(this);
@@ -151,23 +141,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 设置初始窗口标题
     setWindowTitle("TinyIDE - 未命名");
-    // 全局查找/替换由 MainWindow 转发到当前编辑器
-    connect(ui->actionFind, &QAction::triggered, this, [this]() {
-        Editor *e = currentEditor();
-        if (e) e->handleFind();
-    });
-    connect(ui->actionReplace, &QAction::triggered, this, [this]() {
-        Editor *e = currentEditor();
-        if (e) e->handleReplace();
-    });
-    connect(aHighlight, &QAction::triggered, this, [this]() {
-        Editor *e = currentEditor();
-        if (e) e->highlightSelection();
-    });
-    connect(aClear, &QAction::triggered, this, [this]() {
-        Editor *e = currentEditor();
-        if (e) e->clearAllHighlights();
-    });
 
     // 设置停止按钮的快捷键和初始状态
     ui->actionStop->setShortcut(QKeySequence(Qt::Key_Escape));
@@ -197,8 +170,8 @@ MainWindow::MainWindow(QWidget *parent)
             });
 
     // 延迟调用，确保编辑器能够找到主窗口
-    //QTimer::singleShot(100, this, [this, editor]()
-    //                   { editor->findActionsFromMainWindow(); });
+    QTimer::singleShot(100, this, [this, editor]()
+                       { editor->findActionsFromMainWindow(); });
 }
 
 // 析构函数：清理资源
@@ -410,17 +383,11 @@ void MainWindow::handleRunOutput(const QString &output)
 // 新建文件处理
 void MainWindow::on_actionNew_triggered()
 {
-
     // 获取默认字体
     QFont defaultFont = getDefaultEditorFont();
 
     // 创建新编辑器
     Editor *editor = new Editor();
-
-    // 连接行数超限信号
-    connect(editor, &Editor::lineCountExceeded, this, [this]() {
-        QMessageBox::warning(this, "警告", "文本行数不得超过2000行！");
-    });
 
     // 设置初始示例代码
     QString initialCode =
@@ -465,8 +432,8 @@ void MainWindow::on_actionNew_triggered()
     m_tabInfos.append(info);
 
     // 延迟调用，确保编辑器能够找到主窗口
-    //QTimer::singleShot(100, this, [editor]()
-    //                  { editor->findActionsFromMainWindow(); });
+    QTimer::singleShot(100, this, [editor]()
+                       { editor->findActionsFromMainWindow(); });
 
     // 切换到新标签页
     m_tabWidget->setCurrentIndex(newIndex);
@@ -504,25 +471,11 @@ void MainWindow::on_actionOpen_triggered()
     // 确保新编辑器使用默认字体
     editor->setEditorFont(defaultFont);
 
+    // 显示文件内容
     QTextStream in(&file);
-    QString content = in.readAll();
-    // 检查行数
-    if (content.count('\n') + 1 > 2000) {
-        QMessageBox::critical(this, "错误", "文件行数超过2000行，无法打开！");
-        file.close();
-        delete editor; // 清理已创建的编辑器
-        return;
-    }
+    editor->setPlainText(in.readAll());
+    editor->setOriginalText(in.readAll());
     file.close();
-
-    // 设置编辑器内容
-    editor->setPlainText(content);
-    editor->setOriginalText(content);
-
-    // 连接行数超限信号
-    connect(editor, &Editor::lineCountExceeded, this, [this]() {
-        QMessageBox::warning(this, "警告", "文本行数不得超过2000行！");
-    });
 
     // 连接编辑器内容变化信号
     connect(editor, &QPlainTextEdit::textChanged,
@@ -543,8 +496,8 @@ void MainWindow::on_actionOpen_triggered()
     m_tabInfos.append(info);
 
     // 延迟调用，确保编辑器能够找到主窗口
-    //QTimer::singleShot(100, this, [editor]()
-    //                   { editor->findActionsFromMainWindow(); });
+    QTimer::singleShot(100, this, [editor]()
+                       { editor->findActionsFromMainWindow(); });
 
     // 切换到新标签页
     m_tabWidget->setCurrentIndex(newIndex);
@@ -733,3 +686,4 @@ void MainWindow::onSendInput()
         m_inputLineEdit->clear();
     }
 }
+
