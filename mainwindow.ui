@@ -40,6 +40,9 @@
       <height>80</height>
      </rect>
     </property>
+    <property name="currentIndex">
+     <number>0</number>
+    </property>
     <widget class="QWidget" name="tab_5">
      <attribute name="title">
       <string>Tab 1</string>
@@ -83,7 +86,7 @@
      <x>0</x>
      <y>0</y>
      <width>919</width>
-     <height>21</height>
+     <height>23</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -124,9 +127,6 @@
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <widget class="QToolBar" name="toolBar">
-   <property name="enabled">
-    <bool>true</bool>
-   </property>
    <property name="windowTitle">
     <string>toolBar</string>
    </property>
@@ -140,6 +140,7 @@
    <addaction name="actionOpen"/>
    <addaction name="actionSave"/>
    <addaction name="actionSaveAs"/>
+   <addaction name="actionUndo"/>
    <addaction name="actionCompile"/>
    <addaction name="actionRun"/>
    <addaction name="actionStop"/>
@@ -177,15 +178,6 @@
   <action name="actionUndo">
    <property name="text">
     <string>撤销(&amp;U)</string>
-   </property>
-   <property name="visible">
-    <bool>true</bool>
-   </property>
-   <property name="iconVisibleInMenu">
-    <bool>true</bool>
-   </property>
-   <property name="shortcutVisibleInContextMenu">
-    <bool>true</bool>
    </property>
   </action>
   <action name="actionCopy">
