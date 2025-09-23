@@ -94,14 +94,17 @@ protected:
     void loadChineseTranslation();
     void wheelEvent(QWheelEvent *event) override;
 
+public slots:
+    void handleFind();
+    void handleReplace();
+
 private slots:
     void handleUndo();
     void handleCut();
     void handleCopy();
     void handlePaste();
     void updatePasteState();
-    void handleFind();
-    void handleReplace();
+
     void findNext();
     void findPrevious();
     void clearFindHighlights();
