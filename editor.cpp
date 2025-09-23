@@ -179,22 +179,6 @@ void Editor::keyPressEvent(QKeyEvent *event)
             cursor.removeSelectedText();
             cursor.insertText(indent + "}");
         }
-
-        int tabWidth = tabStopWidth() / fontMetrics().width(' ');
-        QString indent = QString(tabWidth * indentLevel, ' ');
-
-        QTextCursor cursor = textCursor();
-        cursor.insertText("}");
-
-        // 调整行首缩进
-        cursor.movePosition(QTextCursor::StartOfLine);
-        cursor.movePosition(QTextCursor::EndOfLine, QTextCursor::KeepAnchor);
-        QString line = cursor.selectedText();
-        if (line.trimmed() == "}")
-        {
-            cursor.removeSelectedText();
-            cursor.insertText(indent + "}");
-        }
         setTextCursor(cursor);
         event->accept();
         return;
@@ -355,36 +339,6 @@ void Editor::checkAndClearBracketHighlight()
             }
         }
 
-        if (shouldClear)
-        {
-            clearBracketHighlight();
-        }
-        else
-        {
-            // 重新高亮以确保位置正确
-            highlightMatchingBracket();
-        }
-    }
-}
-void Editor::checkAndClearBracketHighlight()
-{
-    if (!m_bracketSelections.isEmpty())
-    {
-        QTextCursor cursor = textCursor();
-        QTextDocument *doc = document();
-
-        // 检查高亮的括号是否还存在
-        bool shouldClear = false;
-        for (const auto &selection : m_bracketSelections)
-        {
-            int bracketPos = selection.cursor.position();
-            if (bracketPos >= doc->characterCount() ||
-                doc->characterAt(bracketPos) != selection.cursor.selectedText().at(0))
-            {
-                shouldClear = true;
-                break;
-            }
-        }
         if (shouldClear)
         {
             clearBracketHighlight();

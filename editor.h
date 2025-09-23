@@ -147,9 +147,6 @@ private:
     QList<QTextEdit::ExtraSelection> m_selectionExtraSelections;
     void highlightAllMatches();
 
-    void highlightSelection();
-    void clearAllHighlights();
-
     QHash<QChar, QChar> m_matchingPairs;
     int findMatchingBracket(int startPos, QChar bracket, QChar matchBracket, int direction);
     void highlightBracketPair(int pos1, int pos2);
