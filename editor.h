@@ -62,10 +62,6 @@ public:
     void highlightSelection();
     void clearAllHighlights();
 
-    void handleFind();
-    void handleReplace();
-    void lineCountExceeded();
-
     bool isLineCountValid() const;
 
     // 行号显示区域
