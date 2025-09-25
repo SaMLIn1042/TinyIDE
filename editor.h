@@ -99,12 +99,13 @@ protected:
 public slots:
     void handleFind();
     void handleReplace();
+    void handlePaste();
 
 private slots:
     void handleUndo();
     void handleCut();
     void handleCopy();
-    void handlePaste();
+
     void updatePasteState();
     void findNext();
     void findPrevious();

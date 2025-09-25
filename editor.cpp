@@ -255,9 +255,13 @@ void Editor::keyPressEvent(QKeyEvent *event)
         }
     }
 
-    // 默认处理
-    QPlainTextEdit::keyPressEvent(event);
-    highlightMatchingBracket(); // 更新括号高亮
+    // 检查是否是粘贴快捷键 (Ctrl+V)
+    if (event->modifiers() & Qt::ControlModifier && event->key() == Qt::Key_V) {
+        // 让默认处理机制处理粘贴操作
+        QPlainTextEdit::keyPressEvent(event);
+        highlightMatchingBracket(); // 更新括号高亮
+        return;
+    }
 }
 
 // 计算行号区域宽度
@@ -617,8 +621,8 @@ void Editor::setupConnections()
         connect(cutAction, &QAction::triggered, this, &Editor::handleCut);
     if (copyAction)
         connect(copyAction, &QAction::triggered, this, &Editor::handleCopy);
-    if (pasteAction)
-        connect(pasteAction, &QAction::triggered, this, &Editor::handlePaste);
+//    if (pasteAction)
+//        connect(pasteAction, &QAction::triggered, this, &Editor::handlePaste);
     if (findAction)
         connect(findAction, &QAction::triggered, this, &Editor::handleFind);
     if (replaceAction)
@@ -708,7 +712,8 @@ void Editor::handlePaste()
 {
     QClipboard *clipboard = QApplication::clipboard();
     QString text = clipboard->text();
-
+    if (text.isEmpty())
+        return;
     // 替换Tab为空格
     int tabWidth = tabStopWidth() / fontMetrics().width(' ');
     text.replace("\t", QString(" ").repeated(tabWidth));

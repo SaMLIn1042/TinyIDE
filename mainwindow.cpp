@@ -54,6 +54,10 @@ MainWindow::MainWindow(QWidget *parent)
             Editor *e = currentEditor();
             if (e) e->clearAllHighlights();
         });
+      connect(ui->actionPaste, &QAction::triggered, this, [this]() {
+          Editor *e = currentEditor();
+          if (e) e->handlePaste();
+      });
 
     // 创建标签页控件
     m_tabWidget = new QTabWidget(this);
