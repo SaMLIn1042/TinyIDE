@@ -1,4 +1,3 @@
-
 #include "compiler.h"
 #include <QDebug>
 #include <QDir>
@@ -302,4 +301,3 @@ void Compiler::onRunProcessFinished(int exitCode, QProcess::ExitStatus exitStatu
     // 发送运行完成信号
     emit runFinished(exitCode == 0, result);
 }
-
