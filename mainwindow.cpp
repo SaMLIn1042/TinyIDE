@@ -1,4 +1,3 @@
-
 #include "editor.h"
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
@@ -54,10 +53,6 @@ MainWindow::MainWindow(QWidget *parent)
             Editor *e = currentEditor();
             if (e) e->clearAllHighlights();
         });
-      connect(ui->actionPaste, &QAction::triggered, this, [this]() {
-          Editor *e = currentEditor();
-          if (e) e->handlePaste();
-      });
 
     // 创建标签页控件
     m_tabWidget = new QTabWidget(this);
@@ -174,7 +169,12 @@ MainWindow::MainWindow(QWidget *parent)
         Editor *e = currentEditor();
         if (e) e->clearAllHighlights();
     });
-
+    connect(ui->actionFont, &QAction::triggered, this, [this]() {
+        Editor *e = currentEditor();
+        if (e) {
+            e->handleFontSettings();
+        }
+    });
     // 设置停止按钮的快捷键和初始状态
     ui->actionStop->setShortcut(QKeySequence(Qt::Key_Escape));
     ui->actionStop->setEnabled(false);
@@ -202,9 +202,6 @@ MainWindow::MainWindow(QWidget *parent)
                 m_inputWidget->setEnabled(false); // 禁用输入区域
             });
 
-    // 延迟调用，确保编辑器能够找到主窗口
-    //QTimer::singleShot(100, this, [this, editor]()
-    //                   { editor->findActionsFromMainWindow(); });
 }
 
 // 析构函数：清理资源
@@ -422,12 +419,6 @@ void MainWindow::on_actionNew_triggered()
 
     // 创建新编辑器
     Editor *editor = new Editor();
-
-    // 连接行数超限信号
-    connect(editor, &Editor::lineCountExceeded, this, [this]() {
-        QMessageBox::warning(this, "警告", "文本行数不得超过2000行！");
-    });
-
     // 设置初始示例代码
     QString initialCode =
         "#include <stdio.h>\n\n"
@@ -524,11 +515,6 @@ void MainWindow::on_actionOpen_triggered()
     // 设置编辑器内容
     editor->setPlainText(content);
     editor->setOriginalText(content);
-
-    // 连接行数超限信号
-    connect(editor, &Editor::lineCountExceeded, this, [this]() {
-        QMessageBox::warning(this, "警告", "文本行数不得超过2000行！");
-    });
 
     // 连接编辑器内容变化信号
     connect(editor, &QPlainTextEdit::textChanged,
@@ -739,4 +725,3 @@ void MainWindow::onSendInput()
         m_inputLineEdit->clear();
     }
 }
-

@@ -61,8 +61,10 @@ public:
     void clearHighlights();
     void highlightSelection();
     void clearAllHighlights();
-
     bool isLineCountValid() const;
+    void handleFind();
+    void handleReplace();
+    void handleFontSettings();
 
     // 行号显示区域
     class LineNumberArea : public QWidget
@@ -87,31 +89,22 @@ public:
     int lineNumberAreaWidth();
     void lineNumberAreaPaintEvent(QPaintEvent *event);
 
-signals:
-    void lineCountExceeded();
-
 protected:
     void resizeEvent(QResizeEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void loadChineseTranslation();
     void wheelEvent(QWheelEvent *event) override;
 
-public slots:
-    void handleFind();
-    void handleReplace();
-    void handlePaste();
-
 private slots:
     void handleUndo();
     void handleCut();
     void handleCopy();
-
+    void handlePaste();
     void updatePasteState();
     void findNext();
     void findPrevious();
     void clearFindHighlights();
     void handleInsert();
-    void handleFontSettings();
     void updateLineNumberAreaWidth(int newBlockCount);
     void highlightCurrentLine();
     void updateLineNumberArea(const QRect &rect, int dy);
@@ -119,7 +112,6 @@ private slots:
     void setTabReplace(bool replace, int spaces = 4);
     void handleComment();
     void highlightMatchingBracket();
-
 private:
     QAction *undoAction;
     QAction *cutAction;
@@ -158,6 +150,10 @@ private:
     int getIndentationLevel() const;
     void checkAndClearBracketHighlight();//及时清除匹配括号高亮
     void checkLineCountLimit();
+    void setupShortcuts();
+
+    // 添加防重复调用保护
+    bool m_connectionsEstablished; // 标记连接是否已建立
 };
 
 #endif // EDITOR_H

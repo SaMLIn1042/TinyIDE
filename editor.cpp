@@ -14,6 +14,7 @@
 #include <QScrollBar>
 #include <QTranslator>
 #include <QLibraryInfo>
+#include <QMessageBox>
 
 // 初始化编辑器组件和状态
 Editor::Editor(QWidget *parent) : QPlainTextEdit(parent),
@@ -32,8 +33,8 @@ Editor::Editor(QWidget *parent) : QPlainTextEdit(parent),
     setTabReplace(true, 4);
     // 关联主窗口动作
     findActionsFromMainWindow();
-    // 建立信号槽连接
-    setupConnections();
+    // 移除这里的 setupConnections(); 调用
+    // 因为 findActionsFromMainWindow() 末尾已经调用了 setupConnections()
     // 更新动作状态
     updateActionStates();
 
@@ -48,15 +49,12 @@ Editor::Editor(QWidget *parent) : QPlainTextEdit(parent),
     m_matchingPairs.insert('\'', '\'');
     m_matchingPairs.insert('"', '"');
 
-
+    // 连接行号和光标相关信号
     connect(this, &Editor::blockCountChanged, this, &Editor::updateLineNumberAreaWidth);
     connect(this, &Editor::updateRequest, this, &Editor::updateLineNumberArea);
     connect(this, &Editor::cursorPositionChanged, this, &Editor::highlightCurrentLine);
     connect(this, &Editor::textChanged, this, &Editor::onTextChanged);
     connect(this, &Editor::cursorPositionChanged, this, &Editor::highlightMatchingBracket);
-
-    connect(this, &QPlainTextEdit::textChanged, this, &Editor::checkLineCountLimit);
-
 
     // 初始化界面状态
     updateLineNumberAreaWidth(0);
@@ -66,7 +64,6 @@ Editor::Editor(QWidget *parent) : QPlainTextEdit(parent),
     // 初始化语法高亮器
     highlighter = new EditorSyntaxHighlighter(document());
 }
-
 // 计算当前行的缩进级别
 int Editor::getIndentationLevel() const
 {
@@ -179,6 +176,7 @@ void Editor::keyPressEvent(QKeyEvent *event)
             cursor.removeSelectedText();
             cursor.insertText(indent + "}");
         }
+
         setTextCursor(cursor);
         event->accept();
         return;
@@ -255,13 +253,9 @@ void Editor::keyPressEvent(QKeyEvent *event)
         }
     }
 
-    // 检查是否是粘贴快捷键 (Ctrl+V)
-    if (event->modifiers() & Qt::ControlModifier && event->key() == Qt::Key_V) {
-        // 让默认处理机制处理粘贴操作
-        QPlainTextEdit::keyPressEvent(event);
-        highlightMatchingBracket(); // 更新括号高亮
-        return;
-    }
+    // 默认处理
+    QPlainTextEdit::keyPressEvent(event);
+    highlightMatchingBracket(); // 更新括号高亮
 }
 
 // 计算行号区域宽度
@@ -315,13 +309,8 @@ void Editor::lineNumberAreaPaintEvent(QPaintEvent *event)
 // 文本变化回调
 void Editor::onTextChanged()
 {
-    // 检查行数是否超过2000
-    if (document()->lineCount() > 2000) {
-        emit lineCountExceeded();
-    }
     highlightNewLines();
     clearBracketHighlight();
-
 }
 void Editor::checkAndClearBracketHighlight()
 {
@@ -503,35 +492,83 @@ QFont Editor::getEditorFont() const
 // 从主窗口查找并关联编辑动作
 void Editor::findActionsFromMainWindow()
 {
+    qDebug() << "=== 开始查找主窗口动作 ===";
+
     QMainWindow *mainWindow = nullptr;
-    QWidget *currentParent = parentWidget();
 
-    // 向上查找主窗口
-    while (currentParent && !mainWindow)
-    {
-        mainWindow = qobject_cast<QMainWindow *>(currentParent);
-        currentParent = currentParent->parentWidget();
-    }
-
-    // 尝试应用顶层窗口
-    if (!mainWindow)
-    {
-        foreach (QWidget *widget, QApplication::topLevelWidgets())
-        {
-            mainWindow = qobject_cast<QMainWindow *>(widget);
-            if (mainWindow)
-                break;
+    // 方法1: 使用传入的parent（正确类型转换）
+    if (parent()) {
+        qDebug() << "方法1: 使用parent()";
+        // 先将 QObject* 转换为 QWidget*
+        QWidget *parentWidget = qobject_cast<QWidget *>(parent());
+        if (parentWidget) {
+            mainWindow = qobject_cast<QMainWindow *>(parentWidget);
+            if (!mainWindow) {
+                // 如果parent不是主窗口，向上查找
+                QWidget *currentParent = parentWidget->parentWidget();
+                while (currentParent && !mainWindow) {
+                    mainWindow = qobject_cast<QMainWindow *>(currentParent);
+                    currentParent = currentParent->parentWidget();
+                }
+            }
         }
     }
 
-    if (!mainWindow)
-    {
-        qDebug() << "警告：未找到主窗口，编辑器动作可能无法正常工作";
+    // 方法2: 使用parentWidget()（已经是QWidget*）
+    if (!mainWindow && parentWidget()) {
+        qDebug() << "方法2: 使用parentWidget()";
+        mainWindow = qobject_cast<QMainWindow *>(parentWidget());
+        if (!mainWindow) {
+            QWidget *currentParent = parentWidget()->parentWidget();
+            while (currentParent && !mainWindow) {
+                mainWindow = qobject_cast<QMainWindow *>(currentParent);
+                currentParent = currentParent->parentWidget();
+            }
+        }
+    }
+
+    // 方法3: 查找应用程序的活跃窗口
+    if (!mainWindow) {
+        qDebug() << "方法3: 查找活跃窗口";
+        QWidget *activeWindow = QApplication::activeWindow();
+        if (activeWindow) {
+            mainWindow = qobject_cast<QMainWindow *>(activeWindow);
+        }
+    }
+
+    // 方法4: 遍历所有顶层窗口
+    if (!mainWindow) {
+        qDebug() << "方法4: 遍历所有顶层窗口";
+        foreach (QWidget *widget, QApplication::topLevelWidgets()) {
+            mainWindow = qobject_cast<QMainWindow *>(widget);
+            if (mainWindow) {
+                qDebug() << "找到主窗口:" << mainWindow->windowTitle();
+                break;
+            }
+        }
+    }
+
+    if (!mainWindow) {
+        qDebug() << "!!! 警告：未找到主窗口，编辑器动作可能无法正常工作";
+        qDebug() << "!!! 将使用备用方案创建独立动作";
+//        createFallbackActions();
         return;
     }
 
-    // 匹配主窗口中的动作
+    qDebug() << "成功找到主窗口:" << mainWindow->windowTitle();
+
+    // 原有的动作查找代码
     QList<QAction *> allActions = mainWindow->findChildren<QAction *>();
+    qDebug() << "主窗口中找到" << allActions.size() << "个动作";
+
+    // 输出所有动作的名称用于调试
+    qDebug() << "所有可用动作:";
+    foreach (QAction *action, allActions) {
+        qDebug() << "   - " << action->objectName() << ":" << action->text()
+                 << "(enabled:" << action->isEnabled() << ")";
+    }
+
+    bool fontActionFound = false;
     foreach (QAction *action, allActions)
     {
         const QString &objName = action->objectName();
@@ -540,130 +577,204 @@ void Editor::findActionsFromMainWindow()
             undoAction = action;
             undoAction->setText(tr("撤销"));
             undoAction->setToolTip(tr("撤销上一步操作 (Ctrl+Z)"));
+            undoAction->setShortcut(QKeySequence::Undo);
         }
         else if (objName == "actionCut")
         {
             cutAction = action;
             cutAction->setText(tr("剪切"));
             cutAction->setToolTip(tr("剪切选中内容到剪贴板 (Ctrl+X)"));
+            cutAction->setShortcut(QKeySequence::Cut);
         }
         else if (objName == "actionCopy")
         {
             copyAction = action;
             copyAction->setText(tr("复制"));
             copyAction->setToolTip(tr("复制选中内容到剪贴板 (Ctrl+C)"));
+            copyAction->setShortcut(QKeySequence::Copy);
         }
         else if (objName == "actionPaste")
         {
             pasteAction = action;
             pasteAction->setText(tr("粘贴"));
             pasteAction->setToolTip(tr("从剪贴板粘贴内容 (Ctrl+V)"));
+            pasteAction->setShortcut(QKeySequence::Paste);
         }
         else if (objName == "actionFind")
         {
             findAction = action;
             findAction->setText(tr("查找"));
             findAction->setToolTip(tr("查找文本 (Ctrl+F)"));
+            findAction->setShortcut(QKeySequence::Find);
         }
         else if (objName == "actionReplace")
         {
             replaceAction = action;
             replaceAction->setText(tr("替换"));
             replaceAction->setToolTip(tr("查找并替换文本 (Ctrl+H)"));
+            replaceAction->setShortcut(QKeySequence("Ctrl+H"));
         }
         else if (objName == "actionInsert")
         {
             insertAction = action;
             insertAction->setText(tr("插入"));
             insertAction->setToolTip(tr("插入文本"));
+            insertAction->setShortcut(QKeySequence("Ctrl+I"));
         }
         else if (objName == "actionFont")
         {
             fontAction = action;
+            fontActionFound = true;
             fontAction->setText(tr("文字设置"));
             fontAction->setToolTip(tr("设置编辑器字体 (Ctrl+F12)"));
+            fontAction->setShortcut(QKeySequence("Ctrl+F12"));
+            qDebug() << "!!! 找到字体动作 !!!";
         }
         else if (objName == "actionHighlightSelection")
         {
             highlightSelectionAction = action;
             highlightSelectionAction->setText(tr("高亮所选"));
             highlightSelectionAction->setToolTip(tr("高亮显示所有选中内容的匹配项"));
+            highlightSelectionAction->setShortcut(QKeySequence("Ctrl+Shift+H"));
         }
         else if (objName == "actionClearHighlights")
         {
             clearHighlightsAction = action;
             clearHighlightsAction->setText(tr("清除高亮"));
             clearHighlightsAction->setToolTip(tr("清除所有高亮显示"));
+            clearHighlightsAction->setShortcut(QKeySequence("Ctrl+Shift+C"));
         }
     }
 
     // 调试输出
     qDebug() << "动作匹配情况：";
-    qDebug() << "撤销动作: " << (undoAction ? "找到" : "未找到");
-    qDebug() << "剪切动作: " << (cutAction ? "找到" : "未找到");
-    qDebug() << "复制动作: " << (copyAction ? "找到" : "未找到");
-    qDebug() << "粘贴动作: " << (pasteAction ? "找到" : "未找到");
-    qDebug() << "查找动作: " << (findAction ? "找到" : "未找到");
-    qDebug() << "替换动作: " << (replaceAction ? "找到" : "未找到");
-    qDebug() << "插入动作: " << (insertAction ? "找到" : "未找到");
-    qDebug() << "字体动作: " << (fontAction ? "找到" : "未找到");
+    qDebug() << "  撤销动作: " << (undoAction ? "找到" : "未找到");
+    qDebug() << "  剪切动作: " << (cutAction ? "找到" : "未找到");
+    qDebug() << "  复制动作: " << (copyAction ? "找到" : "未找到");
+    qDebug() << "  粘贴动作: " << (pasteAction ? "找到" : "未找到");
+    qDebug() << "  查找动作: " << (findAction ? "找到" : "未找到");
+    qDebug() << "  替换动作: " << (replaceAction ? "找到" : "未找到");
+    qDebug() << "  插入动作: " << (insertAction ? "找到" : "未找到");
+    qDebug() << "  字体动作: " << (fontAction ? "找到" : "未找到");
+
+    if (!fontActionFound) {
+        qDebug() << "!!! 重要：未找到字体动作 'actionFont' !!!";
+    }
 
     setupConnections();
+    qDebug() << "=== 动作查找完成 ===\n";
 }
 
 // 建立动作与编辑器功能的连接
 void Editor::setupConnections()
 {
-    // 连接编辑动作
-    if (undoAction)
+    static bool connectionsEstablished = false;
+       if (connectionsEstablished) {
+           return;
+       }
+       connectionsEstablished = true;
+
+       // 如果连接已经建立，直接返回
+       if (m_connectionsEstablished) {
+           return;
+       }
+    // 连接编辑动作 - 对每个动作都先断开再连接
+    if (undoAction) {
+        disconnect(undoAction, &QAction::triggered, this, &Editor::handleUndo);
         connect(undoAction, &QAction::triggered, this, &Editor::handleUndo);
-    if (cutAction)
+    }
+    if (cutAction) {
+        disconnect(cutAction, &QAction::triggered, this, &Editor::handleCut);
         connect(cutAction, &QAction::triggered, this, &Editor::handleCut);
-    if (copyAction)
+    }
+    if (copyAction) {
+        disconnect(copyAction, &QAction::triggered, this, &Editor::handleCopy);
         connect(copyAction, &QAction::triggered, this, &Editor::handleCopy);
-//    if (pasteAction)
-//        connect(pasteAction, &QAction::triggered, this, &Editor::handlePaste);
-    if (findAction)
+    }
+    if (pasteAction) {
+        disconnect(pasteAction, &QAction::triggered, this, &Editor::handlePaste);
+        connect(pasteAction, &QAction::triggered, this, &Editor::handlePaste);
+    }
+    if (findAction) {
+        disconnect(findAction, &QAction::triggered, this, &Editor::handleFind);
         connect(findAction, &QAction::triggered, this, &Editor::handleFind);
-    if (replaceAction)
+    }
+    if (replaceAction) {
+        disconnect(replaceAction, &QAction::triggered, this, &Editor::handleReplace);
         connect(replaceAction, &QAction::triggered, this, &Editor::handleReplace);
-    if (insertAction)
+    }
+    if (insertAction) {
+        disconnect(insertAction, &QAction::triggered, this, &Editor::handleInsert);
         connect(insertAction, &QAction::triggered, this, &Editor::handleInsert);
-    if (fontAction)
+    }
+    if (fontAction) {
+        disconnect(fontAction, &QAction::triggered, this, &Editor::handleFontSettings);
         connect(fontAction, &QAction::triggered, this, &Editor::handleFontSettings);
-    if (highlightSelectionAction)
+    }
+    if (highlightSelectionAction) {
+        disconnect(highlightSelectionAction, &QAction::triggered, this, &Editor::highlightSelection);
         connect(highlightSelectionAction, &QAction::triggered, this, &Editor::highlightSelection);
-    if (clearHighlightsAction)
+    }
+    if (clearHighlightsAction) {
+        disconnect(clearHighlightsAction, &QAction::triggered, this, &Editor::clearAllHighlights);
         connect(clearHighlightsAction, &QAction::triggered, this, &Editor::clearAllHighlights);
+    }
 
     // 连接状态更新信号
+    disconnect(this, &QPlainTextEdit::undoAvailable, undoAction, &QAction::setEnabled);
     connect(this, &QPlainTextEdit::undoAvailable, undoAction, &QAction::setEnabled);
+
+    disconnect(this, &QPlainTextEdit::copyAvailable, cutAction, &QAction::setEnabled);
     connect(this, &QPlainTextEdit::copyAvailable, cutAction, &QAction::setEnabled);
+
+    disconnect(this, &QPlainTextEdit::copyAvailable, copyAction, &QAction::setEnabled);
     connect(this, &QPlainTextEdit::copyAvailable, copyAction, &QAction::setEnabled);
+
+    disconnect(QApplication::clipboard(), &QClipboard::dataChanged, this, &Editor::updatePasteState);
     connect(QApplication::clipboard(), &QClipboard::dataChanged, this, &Editor::updatePasteState);
+
+    disconnect(this, &QPlainTextEdit::textChanged, this, &Editor::updateActionStates);
     connect(this, &QPlainTextEdit::textChanged, this, &Editor::updateActionStates);
 
-    // 添加快捷键动作
-    QAction *commentAction = new QAction(tr("注释"), this);
-    commentAction->setShortcut(QKeySequence("Ctrl+/"));
-    commentAction->setToolTip(tr("注释/取消注释所选行 (Ctrl+/)"));
-    connect(commentAction, &QAction::triggered, this, &Editor::handleComment);
-    addAction(commentAction);
+    // 添加快捷键动作 - 确保只创建一次
+    static bool shortcutActionsCreated = false;
+    if (!shortcutActionsCreated) {
+        QAction *commentAction = new QAction(tr("注释"), this);
+        commentAction->setShortcut(QKeySequence("Ctrl+/"));
+        commentAction->setToolTip(tr("注释/取消注释所选行 (Ctrl+/)"));
+        commentAction->setShortcutContext(Qt::WidgetShortcut);
+        connect(commentAction, &QAction::triggered, this, &Editor::handleComment);
+        this->addAction(commentAction);
 
-    QAction *findNextAction = new QAction(tr("查找下一个"), this);
-    findNextAction->setShortcut(QKeySequence::FindNext);
-    findNextAction->setToolTip(tr("查找下一个匹配项 (F3)"));
-    connect(findNextAction, &QAction::triggered, this, &Editor::findNext);
-    addAction(findNextAction);
+        QAction *findNextAction = new QAction(tr("查找下一个"), this);
+        findNextAction->setShortcut(QKeySequence("F3"));
+        findNextAction->setToolTip(tr("查找下一个匹配项 (F3)"));
+        findNextAction->setShortcutContext(Qt::WidgetShortcut);
+        connect(findNextAction, &QAction::triggered, this, [this]() {
+            qDebug() << "查找下一个快捷键触发";
+            this->findNext();
+        });
+        this->addAction(findNextAction);
 
-    QAction *findPrevAction = new QAction(tr("查找上一个"), this);
-    findPrevAction->setShortcut(QKeySequence::FindPrevious);
-    findPrevAction->setToolTip(tr("查找上一个匹配项 (Shift+F3)"));
-    connect(findPrevAction, &QAction::triggered, this, &Editor::findPrevious);
-    addAction(findPrevAction);
+        QAction *findPrevAction = new QAction(tr("查找上一个"), this);
+        findPrevAction->setShortcut(QKeySequence("Shift+F3"));
+        findPrevAction->setToolTip(tr("查找上一个匹配项 (Shift+F3)"));
+        findPrevAction->setShortcutContext(Qt::WidgetShortcut);
+        connect(findPrevAction, &QAction::triggered, this, [this]() {
+            qDebug() << "查找上一个快捷键触发";
+            this->findPrevious();
+        });
+        this->addAction(findPrevAction);
+
+        shortcutActionsCreated = true;
+    }
+
+    // 标记为已连接
+    m_connectionsEstablished = true;
+
+    qDebug() << "Editor connections established successfully";
 }
 
-// 更新动作状态
 void Editor::updateActionStates()
 {
     if (undoAction)
@@ -712,8 +823,7 @@ void Editor::handlePaste()
 {
     QClipboard *clipboard = QApplication::clipboard();
     QString text = clipboard->text();
-    if (text.isEmpty())
-        return;
+
     // 替换Tab为空格
     int tabWidth = tabStopWidth() / fontMetrics().width(' ');
     text.replace("\t", QString(" ").repeated(tabWidth));
@@ -727,6 +837,13 @@ void Editor::handlePaste()
 // 处理查找
 void Editor::handleFind()
 {
+    static bool isExecuting = false;
+    if (isExecuting) {
+        return;
+    }
+    isExecuting = true;
+
+    // 原有的代码
     bool ok;
     QString searchText = QInputDialog::getText(this, tr("查找"),
                                                tr("请输入要查找的内容:"), QLineEdit::Normal,
@@ -736,8 +853,10 @@ void Editor::handleFind()
     searchText.replace("\r\n", "\n");
     searchText.replace('\r', '\n');
 
-    if (!ok || searchText.isEmpty())
+    if (!ok || searchText.isEmpty()) {
+        isExecuting = false;
         return;
+    }
 
     m_searchText = searchText;
     m_searchFlags = QTextDocument::FindFlags();
@@ -746,6 +865,8 @@ void Editor::handleFind()
     // 跳转到第一个匹配
     if (m_currentMatchIndex >= 0 && m_currentMatchIndex < m_matchCursors.size())
         setTextCursor(m_matchCursors[m_currentMatchIndex]);
+
+    isExecuting = false;
 }
 
 // 处理替换
@@ -878,23 +999,6 @@ void Editor::clearAllHighlights()
 }
 
 // 处理字体设置
-void Editor::handleFontSettings()
-{
-    bool ok;
-    QFont currentFont = getEditorFont();
-    QFont newFont = QFontDialog::getFont(&ok, currentFont, this, tr("文字设置"));
-
-    if (ok)
-    {
-        setEditorFont(newFont);
-        // 状态栏提示
-        QMainWindow *mainWindow = qobject_cast<QMainWindow *>(window());
-        if (mainWindow && mainWindow->statusBar())
-            mainWindow->statusBar()->showMessage(tr("字体已更新: %1 %2点").arg(newFont.family()).arg(newFont.pointSize()), 3000);
-
-        qDebug() << "字体已更新为: " << newFont.family() << ", 大小: " << newFont.pointSize() << "点";
-    }
-}
 
 // 设置Tab替换选项
 void Editor::setTabReplace(bool replace, int spaces)
@@ -1286,6 +1390,30 @@ void Editor::wheelEvent(QWheelEvent *event)
     }
 }
 
+void Editor::handleFontSettings()
+{
+    static bool isExecuting = false;
+    if (isExecuting) {
+        QMessageBox::information(this, tr("提示"), tr("字体设置对话框已打开"));
+        return;
+    }
+
+    isExecuting = true;
+
+    try {
+        bool ok = false;
+        QFont font = QFontDialog::getFont(&ok, this->font(), this);
+
+        if (ok) {
+            this->setFont(font);
+        }
+    }
+    catch (...) {
+        // 确保异常时也能重置状态
+    }
+
+    isExecuting = false;  // 确保总是重置
+}
 // 语法高亮器构造函数
 EditorSyntaxHighlighter::EditorSyntaxHighlighter(QTextDocument *parent)
     : QSyntaxHighlighter(parent)
@@ -1383,19 +1511,6 @@ void EditorSyntaxHighlighter::highlightBlock(const QString &text)
 
         setFormat(startIndex, commentLength, multiLineCommentFormat);
         startIndex = text.indexOf(commentStartExpression, startIndex + commentLength);
-    }
-}
-
-
-bool Editor::isLineCountValid() const {
-    return document()->blockCount() <= 2000;
-}
-
-void Editor::checkLineCountLimit() {
-    if (document()->blockCount() > 2000) {
-        // 阻止进一步输入并提示用户
-        undo(); // 撤销最后一次操作（即超限的输入）
-        emit lineCountExceeded();
     }
 }
 
